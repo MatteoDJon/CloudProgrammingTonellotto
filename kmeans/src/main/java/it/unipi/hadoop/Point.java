@@ -85,9 +85,19 @@ public class Point {
 
     public void print(){
         String toPrint="";
-        for (int i = 0; i < point.length; i++)
+        for (int i = 0; i < point.length; i++) {
             toPrint+=Double.toString(this.point[i]);
             toPrint+=" ";
+        }
         System.out.println(toPrint);
+    }
+    public String toString(){
+        String str = "";
+        for (int i = 0; i < point.length-1; i++) {
+            str += Double.toString(this.point[i]);
+            str += " ";
+        }
+        str += Double.toString(this.point[this.point.length - 1]);
+        return str;
     }
 }
