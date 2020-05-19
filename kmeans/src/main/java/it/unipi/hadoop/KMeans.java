@@ -137,9 +137,79 @@ public class KMeans {
         }
     }
 
+    private static List<Point> getCentroidsRandom(int K, long numberOfLines, FileSystem fs, Path inputFile){
+        List<Point> centroids = new ArrayList<>(K);
+        Random rand = new Random();
+        Set<Long> indexesCentroids = new HashSet<>();
+        while (indexesCentroids.size() < K) 
+        {
+            long valueRandom = rand.nextLong();
+            if (valueRandom < numberOfLines)
+                indexesCentroids.add(valueRandom);
+        }
+
+        try (FSDataInputStream inputStream = fs.open(inputFile);
+                BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) 
+        {
+            numberOfLines = 0;
+            String line = reader.readLine();
+            while (line != null) 
+            {
+                if (indexesCentroids.contains(numberOfLines))
+                    centroids.add(new Point(line));
+                ++numberOfLines;
+                line = reader.readLine();
+            }
+        } 
+        catch (Exception ex) 
+        {
+            System.out.println("Problem with reading file points in hadoop");
+            System.exit(1);
+        }
+        return centroids;
+    }
+
+    private static long countLines(FileSystem fs, Path inputFile){
+        long numberOfLines = 0;
+        try (FSDataInputStream inputStream = fs.open(inputFile);
+                BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) 
+        {
+            String line = reader.readLine();
+            while (line != null) 
+            {
+                ++numberOfLines;
+                line = reader.readLine();
+            }
+        } 
+        catch (Exception ex) 
+        {
+            System.out.println("Problem with reading number of points in hadoop");
+            System.exit(1);
+        }
+        return numberOfLines;
+    }
+
+    private static void updateCache(List<Point> c, FileSystem fs, Path cacheFile){
+        try (FSDataOutputStream outputStream = fs.create(cacheFile);
+                BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(outputStream))) 
+        {
+            for (Point line : c) 
+            {
+                writer.write(line.toString(), 0, line.toString().length());
+                writer.newLine();
+            }
+        } 
+        catch (Exception ex) 
+        {
+            System.out.println("Problem with writing file centroids in hadoop");
+            System.exit(1);
+        }
+    }
     public static void main(String[] args) throws Exception {
         Configuration conf = new Configuration();
         String[] otherArgs = new GenericOptionsParser(conf, args).getRemainingArgs();
+
+        // TODO - lasciare che l'utente possa passare dati in input
 
         // if (otherArgs.length < 3) {
         //    System.err.println("Usage: kmeans k: <k parameter> <path-file> <output file>");
@@ -174,73 +244,32 @@ public class KMeans {
         // aprire uno stream dal file
         // prendere le righe e considerarle centroidi
         // salvare i centroidi in un file da usare come cache
-        Set<Long> indexesCentroids = new HashSet<>();
-        Random rand = new Random();
-        List<Point> centroids = new ArrayList<>(K);
+        
+        
+        
         FileSystem fs = inputFile.getFileSystem(conf);
 
-        //long numberOfLines = Files.lines(Paths.get(inputFile.toUri())).count();
-        long numberOfLines = 0;
-        try (FSDataInputStream inputStream = fs.open(inputFile);
-                BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
-            String line = reader.readLine();
-            while (line != null) {
-                ++numberOfLines;
-                line = reader.readLine();
-            }
-        } catch (Exception ex) {
-            System.out.println("Problem with reading number of points in hadoop");
-            System.exit(1);
-        }
-
-        while (indexesCentroids.size() < K) {
-            long valueRandom = rand.nextLong();
-            if (valueRandom < numberOfLines)
-                indexesCentroids.add(valueRandom);
-        }
-
-        try (FSDataInputStream inputStream = fs.open(inputFile);
-                BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
-            numberOfLines = 0;
-            String line = reader.readLine();
-            while (line != null) {
-                if (indexesCentroids.contains(numberOfLines))
-                    centroids.add(new Point(line));
-                ++numberOfLines;
-                line = reader.readLine();
-            }
-        } catch (Exception ex) {
-            System.out.println("Problem with reading file points in hadoop");
-            System.exit(1);
-        }
-
+        long numberOfLines = countLines(fs, inputFile);
+        List<Point> centroids = getCentroidsRandom(K, numberOfLines, fs, inputFile);
         // all centroids are taken from the list of points
-
-        try (FSDataOutputStream outputStream = fs.create(cacheFile);
-                BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(outputStream))) {
-            for (Point line : centroids) {
-                writer.write(line.toString(), 0, line.toString().length());
-                writer.newLine();
-            }
-        } catch (Exception ex) {
-            System.out.println("Problem with writing file centroids in hadoop");
-            System.exit(1);
-        }
-
+        updateCache(centroids, fs, cacheFile);
         // add file cache
         job.addCacheFile(cacheFile.toUri());
-
+        //populate list new Centroids
         List<Point> newCentroids = new ArrayList<>(K);
-        for (int i = 0; i < K; ++i) {
+        for (int i = 0; i < K; ++i) 
+        {
             newCentroids.add(null);
         }
 
         int iterations = 0;
         boolean stop = false;
-        while (iterations < 10 && !stop) {
+        while (iterations < 10 && !stop) 
+        {
             job.waitForCompletion(true);
             // find centroid
-            try (FSDataInputStream inputStream = fs.open(outputFile)) {
+            try (FSDataInputStream inputStream = fs.open(outputFile)) 
+            {
                 // output: clusterid WritableWrapper
                 // in questo loop recuperare i nuovi centroidi e poi conservarli in una lista
                 // Dopo di ciò confrontare i vecchi centroidi con i nuovi centroidi: se sono
@@ -248,7 +277,8 @@ public class KMeans {
                 // Se non sono uguali, allora aggiornare i centroidi nel file cache
                 IntWritable clusterId = new IntWritable();
                 WritableWrapper wr = new WritableWrapper();
-                while (inputStream.available() > 0) {
+                while (inputStream.available() > 0) 
+                {
                     // get cluster ID and compute the rest to newCentroids
 
                     clusterId.readFields(inputStream);
@@ -259,21 +289,29 @@ public class KMeans {
                     newCentroids.set(clusterId.get(), centroideNuovo);
                 }
 
-            } catch (Exception ex) {
+            } 
+            catch (Exception ex) 
+            {
                 System.out.println("Problem with reading file points in hadoop");
                 System.exit(1);
             }
             // check conditions
             stop = true;
-            for (int i = 0; i < K; i++) {
-                if (!centroids.get(i).compare(newCentroids.get(i))) {
+            for (int i = 0; i < K; i++) 
+            {
+                if (!centroids.get(i).compare(newCentroids.get(i))) 
+                {
                     stop = false;
-                    // update
+                    //swap newCentroids and centroids
+                    List<Point> temp = centroids; 
                     centroids = newCentroids;
-                    newCentroids = new ArrayList<>(K);
-                    for (int j = 0; j < K; ++j) {
-                        newCentroids.add(null);
+                    newCentroids = temp;
+                    //reset newCentroids for the next iteration
+                    for (int j = 0; j < K; ++j) 
+                    {
+                        newCentroids.set(j, null);
                     }
+                    updateCache(fs, cacheFile, centroids);
                     break;
                 }
             }
