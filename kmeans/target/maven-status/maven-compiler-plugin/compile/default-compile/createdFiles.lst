@@ -1,0 +1,5 @@
+it/unipi/hadoop/WritableWrapper.class
+it/unipi/hadoop/KMeans$KMeansReducer.class
+it/unipi/hadoop/Point.class
+it/unipi/hadoop/KMeans$NewMapper.class
+it/unipi/hadoop/KMeans.class

@@ -2,6 +2,7 @@ package it.unipi.hadoop;
 
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.StringTokenizer;
 import java.util.Collections;
 import java.util.Random;
@@ -9,12 +10,17 @@ import java.util.Set;
 import java.util.HashSet;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileReader;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.io;
+import org.apache.hadoop.io.*;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
@@ -31,203 +37,252 @@ public class KMeans {
     private static final int K_INDEX = 0;
     private static final int INPUT_INDEX = 1;
     private static final int OUTPUT_INDEX = 2;
-    private static final int D = 0;
+
     private static final String cacheName = "centroids.txt";
-    private static final String outputFileName = "/part-00000";
-    private final static IntWritable one = new IntWritable(1);
+    private static final String outputFileName = "/part-r-00000";
 
-    public static class Point implements Writable {
+    public static class NewMapper extends Mapper<Object, Text, IntWritable, WritableWrapper> {
+        // out: key - clusterId, value - < point, dimension, 1 >
 
-        private List<Double> point = new ArrayList<>(D);
-        private int clusterId = -1;
-        private double minDistance = -1;
-        
-        public Point(String line) {
-            StringTokenizer itr = new StringTokenizer(line);
+        private int D = -1;
+        private List<Point> centroids = new ArrayList<>();
 
-            if (itr.countTokens() != D) {
-                throw new Exception("Elements of point different from D!")
+        public void setup(Context context) {
+            try {
+                File file = new File(context.getCacheFiles()[0]);
+                FileReader fr = new FileReader(file);
+
+                BufferedReader br = new BufferedReader(fr);
+                String line;
+
+                while ((line = br.readLine()) != null)
+                    centroids.add(new Point(line));
+                br.close();
+
+            } catch (Exception e) {
+                e.printStackTrace();
                 return;
             }
-            
-            while (itr.hasMoreTokens()) {
-                point.add( Double.parseDouble( itr.nextToken()) );
-                // NullPointerException - if the string is null
-                // NumberFormatException - if the string does not contain a parsable double.
+
+            int dim = centroids.get(0).getDimension();
+            for (Point c : centroids)
+                if (dim != c.getDimension())
+                    return;
+
+            D = dim;
+        }
+
+        public void map(final Object key, final Text value, final Context context)
+                throws IOException, InterruptedException {
+            // controllo che tutti i centroidi abbiano la stessa dimensione
+            if (D < 0)
+                // TODO - gestione caso d'errore
+                return;
+            Point p = null;
+            try {
+                p = new Point(value.toString());
+            } catch (Exception e) {
+                e.printStackTrace();
+                return; // check later if we have to exit or not
             }
-        }
 
-        public int getClusterId() {
-            return clusterId;
-        }
+            // calculate the distance between p and the centroids
+            int id = 0;
+            int clusterId = 0;
+            double minDistance = -1;
 
-        public void assignToCluster(int clusterId) {
-            this.clusterId = clusterId;
-        }
-
-        public void computeDistance(Point that, int clusterThat) {
-
-            double distance = 0;
-
-            for (int i = 0; i < D; i++)
-                distance += Math.pow(this.point.get(i) - that.point.get(i), 2);
-
-            distance = Math.sqrt(distance);
-            
-            if(minDistance == -1 || distance < minDistance)
-            {
-                minDistance= distance;
-                assignToCluster(clusterThat);
+            for (Point c : centroids) {
+                double distance = p.computeDistance(c);
+                if (minDistance == -1 || distance < minDistance) {
+                    minDistance = distance;
+                    clusterId = id;
+                }
+                id++;
             }
-                     
+
+            context.write(new IntWritable(clusterId), new WritableWrapper(p, D));
+            // key : clusterId, value : <point, centroids dimension, one>
         }
     }
 
-    public void map(final Object key, final Text value, final Context context)  throws IOException, InterruptedException {
-        ArrayList<Point> centroids = new ArrayList<Point>();
-        
-        File file = new File( context.getCacheFile() );
-        FileReader fr = new FileReader(file); 
-        BufferedReader br = new BufferedReader(fr);
-        String line;
-
-        while((line = br.readLine()) != null){
-            centroids.append( new Point( line ) );            
-        }
-        
-        Point p = new Point( value.toString() );
-    
-        // calculate the distance between p and the centroids
-        int id = 0;
-        for( Point c : centroids ){
-            p.computeDistance( c , id);
-            id ++ ;
-        }
-    
-        outputKey.set( new IntWritable( p.getClusterID() );
-        outputValue.set(p, one);
-
-        context.write(outputKey, outputValue);
-        }
-    }
-  
     public static class KMeansReducer
-         extends Reducer<Text,Text,NullWritable,Text> {
-      private Text result ;
-  
-      public void reduce(Text key, Iterable<Text> values,
-                         Context context
-                         ) throws IOException, InterruptedException {
-        int sum = 0;
-        int countPoint = 0;
-        String[] value;
-        for( Text val: values)
-        {
-            value = val.toString().split(",");
-            int valuePoint = Integer.parseInt(value[0]);
-            int onePoint = Integer.parseInt(value[1]);
-            sum += valuePoint;
-            countPoint += onePoint;
+            extends Reducer<IntWritable, Iterable<WritableWrapper>, IntWritable, WritableWrapper> {
+        // out : key - clusterId, values - <Point, centroids dimension, Denominator>
+
+        public void reduce(IntWritable key, Iterable<WritableWrapper> values, Context context)
+                throws IOException, InterruptedException {
+            int d = -1;
+            int id = 0;
+
+            Point numerator = null; // costruttore di un punto di dim : d e valori : 0
+            int denominator = 0;
+
+            for (WritableWrapper val : values) {
+                if (id == 0) {
+                    // primo step
+                    // inizializzazione point di tutti 0 di dimensione d = dimensione dei centroidi
+                    d = val.getDimension();
+                    numerator = new Point(d);
+                }
+                id++;
+                try {
+                    numerator.sum(val.getPoint());
+                } catch (Exception e) {
+                    System.out.println("WRN: Point dimension mismatch");
+                }
+
+                denominator += val.getOne();
+            }
+            context.write(key, new WritableWrapper(numerator, d, denominator));
         }
-        result = new Text(Integer.toString(sum)+","+Integer.toString(countPoint));
-        context.write(key, result);
-      }
     }
-  
+
     public static void main(String[] args) throws Exception {
         Configuration conf = new Configuration();
         String[] otherArgs = new GenericOptionsParser(conf, args).getRemainingArgs();
 
-        if (otherArgs.length < 3) {
-            System.err.println("Usage: kmeans k: <k parameter> <path-file> <output file>");
-            System.exit(2);
-        }
+        // if (otherArgs.length < 3) {
+        //    System.err.println("Usage: kmeans k: <k parameter> <path-file> <output file>");
+        //    System.exit(2);
+        // }
 
-        int K = Integer.parseInt( otherArgs[ K_INDEX ]  ); 
+        // int K = Integer.parseInt(otherArgs[K_INDEX]);
+        int K = 3;
 
         Job job = Job.getInstance(conf, "k means");
         job.setJarByClass(KMeans.class);
-        job.setMapperClass(KMeansMapper.class);
-        job.setCombinerClass(KMeansCombiner.class);
+        job.setMapperClass(NewMapper.class);
+        // job.setCombinerClass(KMeansCombiner.class);
         job.setReducerClass(KMeansReducer.class);
-        job.setOutputKeyClass(Text.class);
-        job.setOutputValueClass(Text.class);
+        job.setOutputKeyClass(IntWritable.class);
+        job.setOutputValueClass(WritableWrapper.class);
+
+        // Path inputFile = new Path(otherArgs[INPUT_INDEX]);
+        // Path outputDir = new Path(otherArgs[OUTPUT_INDEX]);
+        // Path outputFile = new Path(otherArgs[OUTPUT_INDEX] + outputFileName);
+        // Path cacheFile = new Path(cacheName);
         
-        Path inputFile = new Path( otherArgs[INPUT_INDEX] );
-        Path outputDir = new Path( otherArgs[OUTPUT_INDEX] );
-        Path outputFile = new Path( otherArgs[OUTPUT_INDEX] + outputFileName);
+        Path inputFile = new Path( "data.txt" );
+        Path outputDir = new Path( "output" );
+        Path outputFile = new Path( "output" + outputFileName);
         Path cacheFile = new Path(cacheName);
 
         FileInputFormat.addInputPath(job, inputFile);
         FileOutputFormat.setOutputPath(job, outputDir);
-        
-        
-        //generare k indici di riga da selezionare a caso
-        //aprire uno stream dal file
-        //prendere le righe e considerarle centroidi
-        //salvare i centroidi in un file da usare come cache
+
+        // generare k indici di riga da selezionare a caso
+        // aprire uno stream dal file
+        // prendere le righe e considerarle centroidi
+        // salvare i centroidi in un file da usare come cache
         Set<Long> indexesCentroids = new HashSet<>();
         Random rand = new Random();
-        List<String> centroids = new ArrayList<>();
+        List<Point> centroids = new ArrayList<>(K);
         FileSystem fs = inputFile.getFileSystem(conf);
 
-        long numberOfLines = Files.lines(inputFile).count();
-        while (indexesCentroids.size() < K){
+        //long numberOfLines = Files.lines(Paths.get(inputFile.toUri())).count();
+        long numberOfLines = 0;
+        try (FSDataInputStream inputStream = fs.open(inputFile);
+                BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
+            String line = reader.readLine();
+            while (line != null) {
+                ++numberOfLines;
+                line = reader.readLine();
+            }
+        } catch (Exception ex) {
+            System.out.println("Problem with reading number of points in hadoop");
+            System.exit(1);
+        }
+
+        while (indexesCentroids.size() < K) {
             long valueRandom = rand.nextLong();
             if (valueRandom < numberOfLines)
-                indexesCentroids.add(valueRandom); 
-        }  
+                indexesCentroids.add(valueRandom);
+        }
 
         try (FSDataInputStream inputStream = fs.open(inputFile);
-         BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream)))
-        {
+                BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
             numberOfLines = 0;
-            String line = reader.nextLine();
+            String line = reader.readLine();
             while (line != null) {
                 if (indexesCentroids.contains(numberOfLines))
-                    centroids.add(line);
+                    centroids.add(new Point(line));
                 ++numberOfLines;
-                line = reader.nextLine();
+                line = reader.readLine();
             }
+        } catch (Exception ex) {
+            System.out.println("Problem with reading file points in hadoop");
+            System.exit(1);
         }
-        catch (Exception ex){System.out.println("Problem with reading file points in hadoop"); System.exit(1);}
 
-        //all centroids are taken from the list of points
-        
-        try (FSDataOutputStream outputStream = fs.create(cacheFile); 
-            BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(outputStream)))
-        {
-            for (String line : centroids){
-                writer.write(line, 0, line.length());
+        // all centroids are taken from the list of points
+
+        try (FSDataOutputStream outputStream = fs.create(cacheFile);
+                BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(outputStream))) {
+            for (Point line : centroids) {
+                writer.write(line.toString(), 0, line.toString().length());
                 writer.newLine();
             }
+        } catch (Exception ex) {
+            System.out.println("Problem with writing file centroids in hadoop");
+            System.exit(1);
         }
-        catch (Exception ex){System.out.println("Problem with writing file centroids in hadoop"); System.exit(1);}
 
-        //add file cache 
-        job.addFileCache(new URI(cacheName));
+        // add file cache
+        job.addCacheFile(cacheFile.toUri());
 
-        while (true){
+        List<Point> newCentroids = new ArrayList<>(K);
+        for (int i = 0; i < K; ++i) {
+            newCentroids.add(null);
+        }
+
+        int iterations = 0;
+        boolean stop = false;
+        while (iterations < 10 && !stop) {
             job.waitForCompletion(true);
-            // find centroids
-            try (FSDataInputStream inputStream = fs.open(outputFile);
-             BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream)))
-            {
-                //output file : id cluster(index in cache file), somma e numero di punti
-                //in questo loop recuperare i nuovi centroidi e poi conservarli in una lista
-                //Dopo di ciò confrontare i vecchi centroidi con i nuovi centroidi: se sono uguali, break dal loop while
-                //Se non sono uguali, allora aggiornare i centroidi nel file cache
+            // find centroid
+            try (FSDataInputStream inputStream = fs.open(outputFile)) {
+                // output: clusterid WritableWrapper
+                // in questo loop recuperare i nuovi centroidi e poi conservarli in una lista
+                // Dopo di ciò confrontare i vecchi centroidi con i nuovi centroidi: se sono
+                // uguali, break dal loop while
+                // Se non sono uguali, allora aggiornare i centroidi nel file cache
+                IntWritable clusterId = new IntWritable();
+                WritableWrapper wr = new WritableWrapper();
+                while (inputStream.available() > 0) {
+                    // get cluster ID and compute the rest to newCentroids
+
+                    clusterId.readFields(inputStream);
+                    wr.readFields(inputStream);
+
+                    Point centroideNuovo = wr.getPoint(); // da popolare con il centroide
+                    centroideNuovo.divide(wr.getOne());
+                    newCentroids.set(clusterId.get(), centroideNuovo);
+                }
+
+            } catch (Exception ex) {
+                System.out.println("Problem with reading file points in hadoop");
+                System.exit(1);
             }
-            catch (Exception ex){System.out.println("Problem with reading file points in hadoop"); System.exit(1);}
+            // check conditions
+            stop = true;
+            for (int i = 0; i < K; i++) {
+                if (!centroids.get(i).compare(newCentroids.get(i))) {
+                    stop = false;
+                    // update
+                    centroids = newCentroids;
+                    newCentroids = new ArrayList<>(K);
+                    for (int j = 0; j < K; ++j) {
+                        newCentroids.add(null);
+                    }
+                    break;
+                }
+            }
 
-            // update centroids
+            iterations++;
         }
-
-        
+        for (int i = 0; i < K; ++i) {
+            centroids.get(i).print();
+        }
     }
-  }
 
-
-
-
-
+}
