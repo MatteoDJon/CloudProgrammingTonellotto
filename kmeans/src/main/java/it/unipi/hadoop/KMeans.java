@@ -56,7 +56,7 @@ public class KMeans {
                 String line;
 
                 while ((line = br.readLine()) != null)
-                    centroids.add(new Point(line));
+                    centroids.add(Point.parseString(line));
                 br.close();
 
             } catch (Exception e) {
@@ -80,7 +80,7 @@ public class KMeans {
                 return;
             Point p = null;
             try {
-                p = new Point(value.toString());
+                p = Point.parseString(value.toString());
             } catch (Exception e) {
                 e.printStackTrace();
                 return; // check later if we have to exit or not
@@ -153,7 +153,7 @@ public class KMeans {
             String line = reader.readLine();
             while (line != null) {
                 if (indexesCentroids.contains(numberOfLines))
-                    centroids.add(new Point(line));
+                    centroids.add(Point.parseString(line));
                 ++numberOfLines;
                 line = reader.readLine();
             }

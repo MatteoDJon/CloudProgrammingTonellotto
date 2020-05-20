@@ -19,23 +19,25 @@ public class Point {
         point = a;
     }
 
-    public Point(String line) throws Exception {
+    public static Point parseString(String line) throws Exception {
         StringTokenizer itr = new StringTokenizer(line);
 
         int d = itr.countTokens();
 
         if (d <= 0)
-            throw new Exception("Invalid point");
+            throw new Exception("Invalid point string");
 
-        point = new double[d];
+        double array[] = new double[d];
 
         int i = 0;
         while (itr.hasMoreTokens()) {
-            point[i] = Double.parseDouble(itr.nextToken());
+            array[i] = Double.parseDouble(itr.nextToken());
             // NullPointerException if the string is null
             // NumberFormatException if the string does not contain a parsable double.
             i++;
         }
+
+        return new Point(array);
     }
 
     public int getDimension() {
