@@ -289,7 +289,7 @@ public class KMeans {
                     for (int j = 0; j < K; ++j) {
                         newCentroids.set(j, null);
                     }
-                    updateCache(fs, cacheFile, centroids);
+                    updateCache(centroids, fs, cacheFile);
                     break;
                 }
             }
