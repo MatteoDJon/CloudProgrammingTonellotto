@@ -21,14 +21,14 @@ public class Point {
 
     public Point(String line) throws Exception {
         StringTokenizer itr = new StringTokenizer(line);
-        
+
         int d = itr.countTokens();
 
         if (d <= 0)
             throw new Exception("Invalid point");
 
         point = new double[d];
-        
+
         int i = 0;
         while (itr.hasMoreTokens()) {
             point[i] = Double.parseDouble(itr.nextToken());
@@ -44,28 +44,17 @@ public class Point {
 
     public void sum(Point that) throws Exception {
 
-        if ( that.getDimension() != this.getDimension() )
+        if (that.getDimension() != this.getDimension())
             throw new Exception("Point dimension mismatch");
 
         for (int i = 0; i < point.length; i++)
             this.point[i] += that.point[i];
     }
-    
-    public void divide( int denominator ) throws ArithmeticException{
+
+    public void divide(int scalar) throws ArithmeticException {
         for (int i = 0; i < point.length; i++)
-            this.point[i] = this.point[i] / denominator;
+            this.point[i] = this.point[i] / scalar;
     }
-    
-    public boolean compare( Point p ){
-        if( this.point.length != p.getDimension() )
-            return false;
-         
-        for (int i = 0; i < point.length; i++)
-            if ( this.point[i] != p.point[i] )
-                return false;
-        
-        return true;
-    } 
 
     public double computeDistance(Point that) {
 
@@ -75,7 +64,7 @@ public class Point {
             distance += Math.pow(this.point[i] - that.point[i], 2);
 
         distance = Math.sqrt(distance);
-        
+
         return distance;
     }
 
@@ -83,21 +72,48 @@ public class Point {
         return new ArrayPrimitiveWritable(point);
     }
 
-    public void print(){
-        String toPrint="";
-        for (int i = 0; i < point.length; i++) {
-            toPrint+=Double.toString(this.point[i]);
-            toPrint+=" ";
-        }
-        System.out.println(toPrint);
+    public void print() {
+        System.out.println(toString());
     }
-    public String toString(){
+
+    @Override
+    public String toString() {
         String str = "";
-        for (int i = 0; i < point.length-1; i++) {
+        for (int i = 0; i < point.length - 1; i++) {
             str += Double.toString(this.point[i]);
             str += " ";
         }
         str += Double.toString(this.point[this.point.length - 1]);
         return str;
     }
+
+    @Override
+    public boolean equals(Object o) {
+        // self check
+        if (this == o)
+            return true;
+        // null check
+        if (o == null)
+            return false;
+        // type check and cast
+        if (getClass() != o.getClass())
+            return false;
+        Point that = (Point) o;
+        // field comparison
+        for (int i = 0; i < point.length; i++)
+            if (this.point[i] != that.point[i])
+                return false;
+
+        return true;
+    }
+
+    /*
+     * public boolean compare(Point that) { if (this.point.length !=
+     * that.point.length) return false;
+     * 
+     * for (int i = 0; i < point.length; i++) if (this.point[i] != that.point[i])
+     * return false;
+     * 
+     * return true; }
+     */
 }
