@@ -6,6 +6,8 @@ import org.apache.hadoop.io.ArrayPrimitiveWritable;
 
 public class Point {
 
+    // TODO implement Writable
+
     private double[] point;
 
     public Point(int d) {

@@ -8,22 +8,31 @@ public class WritableWrapper implements Writable {
     private IntWritable one = new IntWritable(1);
     private IntWritable dim = new IntWritable(-1);
 
-    public WritableWrapper() {}
-
-    public WritableWrapper(Point p, int d){
-        this.p = p;
-        dim = new IntWritable( d );
+    public WritableWrapper() {
     }
 
-    public WritableWrapper(Point p, int d, int sum){
+    public WritableWrapper(Point p, int d) {
         this.p = p;
-        dim = new IntWritable( d );
-        one = new IntWritable( sum );
+        dim = new IntWritable(d);
     }
 
-    public int getDimension(){ return dim.get(); }
-    public Point getPoint(){ return p; }
-    public int getOne(){ return one.get(); }
+    public WritableWrapper(Point p, int d, int sum) {
+        this.p = p;
+        dim = new IntWritable(d);
+        one = new IntWritable(sum);
+    }
+
+    public int getDimension() {
+        return dim.get();
+    }
+
+    public Point getPoint() {
+        return p;
+    }
+
+    public int getOne() {
+        return one.get();
+    }
 
     public void write(DataOutput out) throws IOException {
         p.getWritable().write(out);
@@ -32,12 +41,19 @@ public class WritableWrapper implements Writable {
     }
 
     public void readFields(DataInput in) throws IOException {
-        ArrayPrimitiveWritable apw = p.getWritable();
+        // TODO fix this part
+        
+        ArrayPrimitiveWritable apw = new ArrayPrimitiveWritable();
         apw.readFields(in);
-        double[] array = (double[]) (double[]) apw.get();
-        p = new Point(array);
+        p = new Point((double[]) apw.get());
 
         one.readFields(in);
         dim.readFields(in);
     }
+
+    @Override
+    public String toString() {
+        return "WritableWrapper [dim=" + dim + ", one=" + one + ", p=" + p + "]";
+    }
+
 }
