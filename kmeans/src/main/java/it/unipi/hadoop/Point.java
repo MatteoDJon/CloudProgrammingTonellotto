@@ -114,7 +114,7 @@ public class Point implements Writable {
 
     @Override
     public void readFields(DataInput in) throws IOException {
-        ArrayPrimitiveWritable apw = new ArrayPrimitiveWritable(Double.class);
+        ArrayPrimitiveWritable apw = new ArrayPrimitiveWritable();
         apw.readFields(in);
         point = (double[]) apw.get();
     }

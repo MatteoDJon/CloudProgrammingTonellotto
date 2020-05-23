@@ -37,7 +37,7 @@ public class WritableWrapper implements Writable {
 
     @Override
     public void readFields(DataInput in) throws IOException {
-        p.readFields(in);
+        p = Point.read(in);
         one.readFields(in);
     }
 
