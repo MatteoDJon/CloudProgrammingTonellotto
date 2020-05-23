@@ -1,41 +1,49 @@
 package it.unipi.hadoop;
 
+import java.io.DataInput;
+import java.io.DataOutput;
+import java.io.IOException;
+import java.text.ParseException;
 import java.util.StringTokenizer;
 
 import org.apache.hadoop.io.ArrayPrimitiveWritable;
+import org.apache.hadoop.io.Writable;
 
-public class Point {
-
-    // TODO implement Writable
+public class Point implements Writable {
 
     private double[] point;
 
+    private Point() {
+
+    }
+
     public Point(int d) {
         if (d <= 0)
-            throw new IllegalArgumentException("Invalid dimension");
+            throw new IllegalArgumentException("Invalid dimension for Point");
 
         point = new double[d];
     }
 
     public Point(double[] a) {
+        if (a == null || a.length <= 0)
+            throw new IllegalArgumentException("Invalid array for Point");
+
         point = a;
     }
 
-    public static Point parseString(String line) throws Exception {
+    public static Point parseString(String line) throws ParseException {
         StringTokenizer itr = new StringTokenizer(line);
 
         int d = itr.countTokens();
 
         if (d <= 0)
-            throw new Exception("Invalid point string");
+            throw new ParseException("Invalid string for Point", 0);
 
         double array[] = new double[d];
 
         int i = 0;
         while (itr.hasMoreTokens()) {
             array[i] = Double.parseDouble(itr.nextToken());
-            // NullPointerException if the string is null
-            // NumberFormatException if the string does not contain a parsable double.
             i++;
         }
 
@@ -46,38 +54,26 @@ public class Point {
         return point.length;
     }
 
-    public void sum(Point that) throws Exception {
-
-        if (that.getDimension() != this.getDimension())
-            throw new Exception("Point dimension mismatch");
-
+    public void sum(Point that) {
         for (int i = 0; i < point.length; i++)
             this.point[i] += that.point[i];
     }
 
-    public void divide(int scalar) throws ArithmeticException {
+    public void divide(int scalar) {
         for (int i = 0; i < point.length; i++)
             this.point[i] = this.point[i] / scalar;
     }
 
     public double computeDistance(Point that) {
 
-        double distance = 0;
+        double distance, sum = 0;
 
         for (int i = 0; i < getDimension(); i++)
-            distance += Math.pow(this.point[i] - that.point[i], 2);
+            sum += Math.pow(this.point[i] - that.point[i], 2);
 
-        distance = Math.sqrt(distance);
+        distance = Math.sqrt(sum);
 
         return distance;
-    }
-
-    public ArrayPrimitiveWritable getWritable() {
-        return new ArrayPrimitiveWritable(point);
-    }
-
-    public void print() {
-        System.out.println(toString());
     }
 
     @Override
@@ -111,13 +107,21 @@ public class Point {
         return true;
     }
 
-    /*
-     * public boolean compare(Point that) { if (this.point.length !=
-     * that.point.length) return false;
-     * 
-     * for (int i = 0; i < point.length; i++) if (this.point[i] != that.point[i])
-     * return false;
-     * 
-     * return true; }
-     */
+    @Override
+    public void write(DataOutput out) throws IOException {
+        new ArrayPrimitiveWritable(point).write(out);
+    }
+
+    @Override
+    public void readFields(DataInput in) throws IOException {
+        ArrayPrimitiveWritable apw = new ArrayPrimitiveWritable(Double.class);
+        apw.readFields(in);
+        point = (double[]) apw.get();
+    }
+
+    public static Point read(DataInput in) throws IOException {
+        Point p = new Point();
+        p.readFields(in);
+        return p;
+    }
 }
