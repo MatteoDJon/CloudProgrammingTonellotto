@@ -29,11 +29,11 @@ public class KMeans {
 
     public static class KMeansMapper extends Mapper<Object, Text, IntWritable, WritableWrapper> {
 
-        private static final Random rng = new Random(31);
-
         private int d;
         private int k;
         private List<Point> centroids;
+        private IntWritable outputKey = new IntWritable(); // reuse
+        private WritableWrapper outputValue = new WritableWrapper(); // reuse
 
         public void setup(Context context) throws IOException, InterruptedException {
             this.d = context.getConfiguration().getInt("kmeans.d", 7);
@@ -66,14 +66,32 @@ public class KMeans {
             try {
                 Point point = Point.parseString(value.toString());
 
-                int randomInt = rng.nextInt(20);
-
-                if (point.getDimension() == d)
-                    context.write(new IntWritable(randomInt), new WritableWrapper(point));
-
                 // ignore, i.e. do not emit, points with dimension different from d
+                if (point.getDimension() != d)
+                    return;
+
+                int nearestClusterId = -1;
+                double minDistance = -1d;
+
+                // find the nearest centroid
+                int id = 0;
+                for (Point centroid : centroids) {
+                    double distance = point.computeDistance(centroid);
+                    if (minDistance == -1 || distance < minDistance) {
+                        minDistance = distance;
+                        nearestClusterId = id;
+                    }
+                    id++;
+                }
+
+                // emit <clusterId, point>
+                outputKey.set(nearestClusterId);
+                outputValue.setPoint(point);
+                context.write(outputKey, outputValue);
+
             } catch (ParseException e) {
                 // ignore malformed points
+                // TODO print something
             }
         }
     }
