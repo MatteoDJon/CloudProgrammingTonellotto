@@ -26,7 +26,7 @@ public class WritableWrapper implements Writable {
 
     @Override
     public String toString() {
-        return "WritableWrapper [" + p + "]";
+        return "WritableWrapper[" + p + "]";
     }
 
     @Override

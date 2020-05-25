@@ -25,11 +25,10 @@ public class KMeans {
 
             try {
                 Point point = Point.parseString(value.toString());
-                WritableWrapper wrapper = new WritableWrapper(point);
 
-                int randomInt = rng.nextInt(20);
-                if (randomInt == 7)
-                    context.write(new IntWritable(randomInt), wrapper);
+                int randomInt = rng.nextInt(100);
+                if (randomInt == 5 || randomInt == 21)
+                    context.write(new IntWritable(randomInt), new WritableWrapper(point));
             } catch (ParseException e) {
                 // ignore malformed points
             }
@@ -37,29 +36,17 @@ public class KMeans {
     }
 
     public static class KMeansReducer
-            extends Reducer<IntWritable, Iterable<WritableWrapper>, IntWritable, WritableWrapper> {
+            extends Reducer<IntWritable, WritableWrapper, Text, Text> {
 
         public void reduce(IntWritable key, Iterable<WritableWrapper> values, Context context)
                 throws IOException, InterruptedException {
-
-            Point point = null, tot = null;
+            
             int count = 0;
 
-            for (WritableWrapper wrapper : values) {
-                point = wrapper.getPoint();
-
-                if (count == 0)
-                    tot = new Point(point); // deep copy
-                else
-                    tot.sum(point);
-                
-                count++;
-            }
-
-            tot.divide(count);
-
-            WritableWrapper result = new WritableWrapper(tot);
-            context.write(key, result);
+            for (WritableWrapper wrapper : values)                
+                count += wrapper.getOne();
+            
+            context.write(new Text(Integer.toString(key.get())), new Text(Integer.toString(count)));
         }
     }
 
@@ -68,19 +55,21 @@ public class KMeans {
 
         Job job = Job.getInstance(conf, "kmeans");
 
-        job.setJarByClass(KMeans.class);
-
-        job.setMapperClass(KMeansMapper.class);
-        job.setReducerClass(KMeansReducer.class);
-
-        job.setOutputKeyClass(IntWritable.class);
-        job.setOutputValueClass(WritableWrapper.class);
-
         Path inputFile = new Path("data.txt");
         Path outputDir = new Path("output");
 
         FileInputFormat.addInputPath(job, inputFile);
         FileOutputFormat.setOutputPath(job, outputDir);
+
+        job.setJarByClass(KMeans.class);
+
+        job.setMapperClass(KMeansMapper.class);
+        job.setReducerClass(KMeansReducer.class);
+
+        job.setMapOutputKeyClass(IntWritable.class);
+        job.setMapOutputValueClass(WritableWrapper.class);
+        job.setOutputKeyClass(Text.class);
+        job.setOutputValueClass(Text.class);
 
         System.exit(job.waitForCompletion(true) ? 0 : 1);
     }
