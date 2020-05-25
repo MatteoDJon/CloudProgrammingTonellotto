@@ -48,8 +48,8 @@ public class KMeans {
             for (WritableWrapper wrapper : values) {
                 point = wrapper.getPoint();
 
-                if (tot == null)
-                    tot = point;
+                if (count == 0)
+                    tot = new Point(point); // deep copy
                 else
                     tot.sum(point);
                 

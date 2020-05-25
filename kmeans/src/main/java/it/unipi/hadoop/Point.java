@@ -4,6 +4,7 @@ import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
 import java.text.ParseException;
+import java.util.Arrays;
 import java.util.StringTokenizer;
 
 import org.apache.hadoop.io.ArrayPrimitiveWritable;
@@ -29,6 +30,10 @@ public class Point implements Writable {
             throw new IllegalArgumentException("Invalid array for Point");
 
         point = a;
+    }
+
+    public Point(final Point p) {
+        point = Arrays.copyOf(p.point, p.point.length);
     }
 
     public static Point parseString(String line) throws ParseException {
