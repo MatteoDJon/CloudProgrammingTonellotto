@@ -20,6 +20,12 @@ public class KMeans {
 
         private static final Random rng = new Random(31);
 
+        private int d;
+
+        public void setup(Context context) throws IOException, InterruptedException {
+            this.d = context.getConfiguration().getInt("kmeans.d", 7);
+        }
+
         public void map(final Object key, final Text value, final Context context)
                 throws IOException, InterruptedException {
 
@@ -27,41 +33,40 @@ public class KMeans {
                 Point point = Point.parseString(value.toString());
 
                 int randomInt = rng.nextInt(20);
-
-                context.write(new IntWritable(randomInt), new WritableWrapper(point));
+                
+                if (point.getDimension() == d)
+                    context.write(new IntWritable(randomInt), new WritableWrapper(point));
             } catch (ParseException e) {
                 // ignore malformed points
             }
         }
     }
 
-    public static class KMeansReducer
-            extends Reducer<IntWritable, WritableWrapper, IntWritable, WritableWrapper> {
+    public static class KMeansReducer extends Reducer<IntWritable, WritableWrapper, IntWritable, WritableWrapper> {
 
-        IntWritable outputKey = new IntWritable();              // reuse
-        WritableWrapper outputValue = new WritableWrapper();    // reuse
+        private IntWritable outputKey = new IntWritable(); // reuse
+        private WritableWrapper outputValue = new WritableWrapper(); // reuse
+        private int d;
+
+        public void setup(Context context) throws IOException, InterruptedException {
+            this.d = context.getConfiguration().getInt("kmeans.d", 7);
+        }
 
         public void reduce(IntWritable key, Iterable<WritableWrapper> values, Context context)
                 throws IOException, InterruptedException {
-            
+
             int count = 0;
-            Point mean = null, p = null;
+            Point p, mean = new Point(d);
 
             for (WritableWrapper wrapper : values) {
                 p = wrapper.getPoint();
 
-                // TODO set d in configuration, init mean, sum always
-
-                if (count == 0)
-                    mean = new Point(p);    // deep copy
-                else
-                    mean.sum(p);
-                
+                mean.sum(p);
                 count++;
             }
 
             mean.divide(count);
-            
+
             outputKey.set(key.get());
             outputValue.setPoint(mean);
 
@@ -71,6 +76,7 @@ public class KMeans {
 
     public static void main(String[] args) throws Exception {
         Configuration conf = new Configuration();
+        conf.setInt("kmeans.d", 6);
 
         Job job = Job.getInstance(conf, "kmeans");
 
