@@ -8,7 +8,6 @@ import java.io.OutputStreamWriter;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -40,7 +39,7 @@ public class KMeans {
             this.k = context.getConfiguration().getInt("kmeans.k", 13);
 
             centroids = new ArrayList<>(k);
-            
+
             Path cache = new Path(cacheName);
             FileSystem fs = cache.getFileSystem(context.getConfiguration());
 
@@ -57,7 +56,7 @@ public class KMeans {
             }
 
             // TODO check if centroids are not k
-            
+
         }
 
         public void map(final Object key, final Text value, final Context context)
@@ -110,20 +109,18 @@ public class KMeans {
                 throws IOException, InterruptedException {
 
             int count = 0;
-            Point p, mean = new Point(d);
+            Point total = new Point(d);
 
             for (WritableWrapper wrapper : values) {
-                p = wrapper.getPoint();
+                Point p = wrapper.getPoint();
 
-                mean.sum(p);
+                total.sum(p);
                 count++;
             }
 
-            mean.divide(count);
-
-            outputKey.set(key.get());
-            outputValue.setPoint(mean);
-
+            // emit<clusterId, (total, count)>
+            outputKey = key;
+            outputValue.setPoint(total).setCount(count);
             context.write(outputKey, outputValue);
         }
     }
@@ -160,7 +157,7 @@ public class KMeans {
         System.out.println("List of random centroids:");
         for (Point point : centroids)
             System.out.println("\t" + point);
-        
+
         updateCache(centroids, fs, cacheFile);
         System.out.println("Random centroids written to cache");
 
