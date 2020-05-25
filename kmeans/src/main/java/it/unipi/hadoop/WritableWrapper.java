@@ -6,9 +6,8 @@ import org.apache.hadoop.io.*;
 public class WritableWrapper implements Writable {
 
     private Point p;
-    private IntWritable one = new IntWritable(1);
 
-    private WritableWrapper() {
+    public WritableWrapper() {
         
     }
 
@@ -20,8 +19,9 @@ public class WritableWrapper implements Writable {
         return p;
     }
 
-    public int getOne() {
-        return one.get();
+    public WritableWrapper setPoint(Point p) {
+        this.p = p;
+        return this;
     }
 
     @Override
@@ -32,13 +32,11 @@ public class WritableWrapper implements Writable {
     @Override
     public void write(DataOutput out) throws IOException {
         p.write(out);
-        one.write(out);
     }
 
     @Override
     public void readFields(DataInput in) throws IOException {
         p = Point.read(in);
-        one.readFields(in);
     }
 
     public static WritableWrapper read(DataInput in) throws IOException {

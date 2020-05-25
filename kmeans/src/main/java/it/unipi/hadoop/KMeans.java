@@ -26,9 +26,9 @@ public class KMeans {
             try {
                 Point point = Point.parseString(value.toString());
 
-                int randomInt = rng.nextInt(100);
-                if (randomInt == 5 || randomInt == 21)
-                    context.write(new IntWritable(randomInt), new WritableWrapper(point));
+                int randomInt = rng.nextInt(20);
+
+                context.write(new IntWritable(randomInt), new WritableWrapper(point));
             } catch (ParseException e) {
                 // ignore malformed points
             }
@@ -36,17 +36,36 @@ public class KMeans {
     }
 
     public static class KMeansReducer
-            extends Reducer<IntWritable, WritableWrapper, Text, Text> {
+            extends Reducer<IntWritable, WritableWrapper, IntWritable, WritableWrapper> {
+
+        IntWritable outputKey = new IntWritable();              // reuse
+        WritableWrapper outputValue = new WritableWrapper();    // reuse
 
         public void reduce(IntWritable key, Iterable<WritableWrapper> values, Context context)
                 throws IOException, InterruptedException {
             
             int count = 0;
+            Point mean = null, p = null;
 
-            for (WritableWrapper wrapper : values)                
-                count += wrapper.getOne();
+            for (WritableWrapper wrapper : values) {
+                p = wrapper.getPoint();
+
+                // TODO set d in configuration, init mean, sum always
+
+                if (count == 0)
+                    mean = new Point(p);    // deep copy
+                else
+                    mean.sum(p);
+                
+                count++;
+            }
+
+            mean.divide(count);
             
-            context.write(new Text(Integer.toString(key.get())), new Text(Integer.toString(count)));
+            outputKey.set(key.get());
+            outputValue.setPoint(mean);
+
+            context.write(outputKey, outputValue);
         }
     }
 
@@ -68,8 +87,8 @@ public class KMeans {
 
         job.setMapOutputKeyClass(IntWritable.class);
         job.setMapOutputValueClass(WritableWrapper.class);
-        job.setOutputKeyClass(Text.class);
-        job.setOutputValueClass(Text.class);
+        job.setOutputKeyClass(IntWritable.class);
+        job.setOutputValueClass(WritableWrapper.class);
 
         System.exit(job.waitForCompletion(true) ? 0 : 1);
     }
