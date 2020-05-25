@@ -43,6 +43,7 @@ public class KMeans {
             Path cache = new Path(cacheName);
             FileSystem fs = cache.getFileSystem(context.getConfiguration());
 
+            // read centroids from cache
             try (FSDataInputStream stream = fs.open(cache);
                     BufferedReader reader = new BufferedReader(new InputStreamReader(stream))) {
 
@@ -109,18 +110,21 @@ public class KMeans {
                 throws IOException, InterruptedException {
 
             int count = 0;
-            Point total = new Point(d);
+            Point mean = new Point(d);
 
             for (WritableWrapper wrapper : values) {
                 Point p = wrapper.getPoint();
 
-                total.sum(p);
+                mean.sum(p);
                 count++;
             }
 
-            // emit<clusterId, (total, count)>
+            // compute mean point
+            mean.divide(count);
+
+            // emit <clusterId, (mean point, count)>
             outputKey = key;
-            outputValue.setPoint(total).setCount(count);
+            outputValue.setPoint(mean).setCount(count);
             context.write(outputKey, outputValue);
         }
     }
@@ -154,12 +158,7 @@ public class KMeans {
         job.setOutputValueClass(WritableWrapper.class);
 
         List<Point> centroids = getRandomCentroids(k, fs, inputFile);
-        System.out.println("List of random centroids:");
-        for (Point point : centroids)
-            System.out.println("\t" + point);
-
         updateCache(centroids, fs, cacheFile);
-        System.out.println("Random centroids written to cache");
 
         System.exit(job.waitForCompletion(true) ? 0 : 1);
     }
