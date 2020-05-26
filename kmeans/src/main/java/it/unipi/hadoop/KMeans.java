@@ -173,7 +173,7 @@ public class KMeans {
         while (success && iteration <= 1) {
             success = job.waitForCompletion(true);
 
-            // readCentroidsFromOutput(newCentroids, fs, outputFile);
+            readCentroidsFromOutput(newCentroids, fs, outputFile);
 
             System.out.println("Old centroids:");
             for (Point point : oldCentroids)
@@ -213,25 +213,25 @@ public class KMeans {
 
         list.clear();
 
-        IntWritable id = new IntWritable();
-        WritableWrapper wrapper = new WritableWrapper();
+        WritableWrapper wrapper;
 
         try (FSDataInputStream fileStream = fs.open(file);
                 BufferedReader reader = new BufferedReader(new InputStreamReader(fileStream))) {
-            
+
             String line = null;
             while ((line = reader.readLine()) != null) {
-                InputStream lineStream = new ByteArrayInputStream(line.getBytes(StandardCharsets.UTF_8));
-                DataInputStream in = new DataInputStream(lineStream);
-                id.readFields(in);
-                wrapper.readFields(in);
+
+                String[] split = line.split("\t"); // split key and value
+                String value = split[1]; // get wrapper string
+
+                wrapper = WritableWrapper.parseString(value);
 
                 list.add(wrapper.getPoint());
             }
 
-        } catch (IOException e) {
+        } catch (IOException | ParseException e) {
             // TODO handle exception
-            System.err.println("IOException");
+            System.err.println("Exception: " + e.getMessage());
         }
 
         // TODO maybe check if centroids are not k
