@@ -2,13 +2,9 @@ package it.unipi.hadoop;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
-import java.io.ByteArrayInputStream;
-import java.io.DataInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
-import java.nio.charset.StandardCharsets;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.List;
@@ -170,18 +166,29 @@ public class KMeans {
         int iteration = 1;
         List<Point> oldCentroids = centroids;
         List<Point> newCentroids = new ArrayList<>(k);
-        while (success && iteration <= 1) {
-            success = job.waitForCompletion(true);
+        while (success && iteration <= 3) {
 
+            // System.out.println("Old centroids " + iteration + ":");
+            // for (Point point : oldCentroids)
+            //     System.out.println("\t" + point);
+            
+            System.out.println("Computing...");
+
+            // compute new centroids
+            success = job.waitForCompletion(false);
+
+            // add new centroids to list
             readCentroidsFromOutput(newCentroids, fs, outputFile);
 
-            System.out.println("Old centroids:");
-            for (Point point : oldCentroids)
-                System.out.println("\t" + point);
+            // System.out.println("New centroids " + iteration + ":");
+            // for (Point point : newCentroids)
+            //     System.out.println("\t" + point);
 
-            System.out.println("New centroids:");
-            for (Point point : newCentroids)
-                System.out.println("\t" + point);
+            // write new centroid to file read from mapper
+            updateCache(newCentroids, fs, cacheFile);
+
+            // before next iteration update old centroids list
+            oldCentroids = newCentroids;
 
             iteration++;
         }
