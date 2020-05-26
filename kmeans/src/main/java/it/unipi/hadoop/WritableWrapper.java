@@ -45,19 +45,19 @@ public class WritableWrapper implements Writable {
 
     @Override
     public String toString() {
-        return "WritableWrapper(" + count + ")[" + p + "]";
+        return "(" + count + ") [" + p + "]";
     }
 
     @Override
     public void write(DataOutput out) throws IOException {
-        p.write(out);
         count.write(out);
+        p.write(out);
     }
 
     @Override
     public void readFields(DataInput in) throws IOException {
-        p = Point.read(in);
         count.readFields(in);
+        p = Point.read(in);        
     }
 
     public static WritableWrapper read(DataInput in) throws IOException {

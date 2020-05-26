@@ -2,9 +2,13 @@ package it.unipi.hadoop;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
+import java.io.ByteArrayInputStream;
+import java.io.DataInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
+import java.nio.charset.StandardCharsets;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.List;
@@ -141,6 +145,7 @@ public class KMeans {
         Path inputFile = new Path("data.txt");
         Path cacheFile = new Path("centroids.txt");
         Path outputDir = new Path("output");
+        Path outputFile = new Path("output/part-r-00000");
 
         FileSystem fs = inputFile.getFileSystem(conf);
 
@@ -157,10 +162,31 @@ public class KMeans {
         job.setOutputKeyClass(IntWritable.class);
         job.setOutputValueClass(WritableWrapper.class);
 
+        // select initial centroids and write them to file
         List<Point> centroids = getRandomCentroids(k, fs, inputFile);
         updateCache(centroids, fs, cacheFile);
 
-        System.exit(job.waitForCompletion(true) ? 0 : 1);
+        boolean success = true;
+        int iteration = 1;
+        List<Point> oldCentroids = centroids;
+        List<Point> newCentroids = new ArrayList<>(k);
+        while (success && iteration <= 1) {
+            success = job.waitForCompletion(true);
+
+            // readCentroidsFromOutput(newCentroids, fs, outputFile);
+
+            System.out.println("Old centroids:");
+            for (Point point : oldCentroids)
+                System.out.println("\t" + point);
+
+            System.out.println("New centroids:");
+            for (Point point : newCentroids)
+                System.out.println("\t" + point);
+
+            iteration++;
+        }
+
+        System.exit(success ? 0 : 1);
     }
 
     private static List<Point> getRandomCentroids(int k, FileSystem fs, Path file) {
@@ -181,6 +207,34 @@ public class KMeans {
         }
 
         return centroids;
+    }
+
+    private static void readCentroidsFromOutput(List<Point> list, FileSystem fs, Path file) {
+
+        list.clear();
+
+        IntWritable id = new IntWritable();
+        WritableWrapper wrapper = new WritableWrapper();
+
+        try (FSDataInputStream fileStream = fs.open(file);
+                BufferedReader reader = new BufferedReader(new InputStreamReader(fileStream))) {
+            
+            String line = null;
+            while ((line = reader.readLine()) != null) {
+                InputStream lineStream = new ByteArrayInputStream(line.getBytes(StandardCharsets.UTF_8));
+                DataInputStream in = new DataInputStream(lineStream);
+                id.readFields(in);
+                wrapper.readFields(in);
+
+                list.add(wrapper.getPoint());
+            }
+
+        } catch (IOException e) {
+            // TODO handle exception
+            System.err.println("IOException");
+        }
+
+        // TODO maybe check if centroids are not k
     }
 
     private static void updateCache(List<Point> centroids, FileSystem fs, Path cache) {
