@@ -136,14 +136,52 @@ public class KMeans {
         conf.setInt("kmeans.d", d);
         conf.setInt("kmeans.k", k);
 
-        Job job = Job.getInstance(conf, "kmeans");
-
         Path inputFile = new Path("data.txt");
         Path cacheFile = new Path("centroids.txt");
         Path outputDir = new Path("output");
         Path outputFile = new Path("output/part-r-00000");
 
         FileSystem fs = inputFile.getFileSystem(conf);
+
+        // select initial centroids and write them to file
+        List<Point> centroids = getRandomCentroids(k, fs, inputFile);
+        updateCache(centroids, fs, cacheFile);
+
+        boolean success = true;
+        int iteration = 1;
+        List<Point> oldCentroids = centroids;
+        List<Point> newCentroids = new ArrayList<>(k);
+        while (success && iteration <= 3) {
+
+            // delete the output directory if exists
+            if (fs.exists(outputDir))
+                fs.delete(outputDir, true);
+
+            // new job to compute new centroids
+            Job kmeansJob = createKMeansJob(conf, inputFile, outputDir);
+            success = kmeansJob.waitForCompletion(true);
+
+            // add new centroids to list
+            readCentroidsFromOutput(newCentroids, fs, outputFile);
+
+            System.out.println("New centroids " + iteration + ":");
+            for (Point point : newCentroids)
+                System.out.println("\t" + point);
+
+            // write new centroid to file read from mapper
+            updateCache(newCentroids, fs, cacheFile);
+
+            // before next iteration update old centroids list
+            oldCentroids = newCentroids;
+
+            iteration++;
+        }
+
+        System.exit(success ? 0 : 1);
+    }
+
+    private static Job createKMeansJob(Configuration conf, Path inputFile, Path outputDir) throws IOException {
+        Job job = Job.getInstance(conf, "kmeans");
 
         FileInputFormat.addInputPath(job, inputFile);
         FileOutputFormat.setOutputPath(job, outputDir);
@@ -158,42 +196,7 @@ public class KMeans {
         job.setOutputKeyClass(IntWritable.class);
         job.setOutputValueClass(WritableWrapper.class);
 
-        // select initial centroids and write them to file
-        List<Point> centroids = getRandomCentroids(k, fs, inputFile);
-        updateCache(centroids, fs, cacheFile);
-
-        boolean success = true;
-        int iteration = 1;
-        List<Point> oldCentroids = centroids;
-        List<Point> newCentroids = new ArrayList<>(k);
-        while (success && iteration <= 3) {
-
-            // System.out.println("Old centroids " + iteration + ":");
-            // for (Point point : oldCentroids)
-            //     System.out.println("\t" + point);
-            
-            System.out.println("Computing...");
-
-            // compute new centroids
-            success = job.waitForCompletion(false);
-
-            // add new centroids to list
-            readCentroidsFromOutput(newCentroids, fs, outputFile);
-
-            // System.out.println("New centroids " + iteration + ":");
-            // for (Point point : newCentroids)
-            //     System.out.println("\t" + point);
-
-            // write new centroid to file read from mapper
-            updateCache(newCentroids, fs, cacheFile);
-
-            // before next iteration update old centroids list
-            oldCentroids = newCentroids;
-
-            iteration++;
-        }
-
-        System.exit(success ? 0 : 1);
+        return job;
     }
 
     private static List<Point> getRandomCentroids(int k, FileSystem fs, Path file) {
