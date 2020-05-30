@@ -1,5 +1,5 @@
 #!/bin/bash
-KMEANS=/home/hadoop/fede/CloudProgrammingTonellotto/kmeans
+KMEANS=/home/hadoop/CloudProgrammingTonellotto/kmeans
 
 mvn clean -f "${KMEANS}/pom.xml"
 mvn package -f "${KMEANS}/pom.xml"
