@@ -13,18 +13,16 @@ public class UniformSampling {
 
     public static class UniformMapper extends Mapper<Object, Text, IntWritable, Text> {
 
-        private final IntWritable one = new IntWritable(1);
+        private static final IntWritable keyInt = new IntWritable();
 
-        public void map(final Object key, final Text value, final Context context)
-                throws IOException, InterruptedException {
-            /*
-             * IntWritable v = new IntWritable(); int numeroVolte =
-             * context.getConfiguration().getInt("k", 1); for (int i = 1; i <= numeroVolte;
-             * ++i){ v.set(i); //oppure setInt context.write(v, value); }
-             */
-            context.write(one, value);
+        public void map(final Object key, final Text value, final Context context) throws IOException, InterruptedException {
+
+            int nStreams = context.getConfiguration().getInt("uniformSampling.nStreams", 1);
+            for (int i = 0; i < nStreams; ++i){
+                keyInt.set(i);
+                context.write(keyInt, value);
+            }
         }
-
     }
 
     public static class UniformReducer extends Reducer<IntWritable, Text, NullWritable, Point> {

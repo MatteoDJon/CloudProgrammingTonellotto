@@ -200,7 +200,7 @@ public class KMeans {
         List<Point> currentCentroids = centroids;
         List<Point> newCentroids = new ArrayList<>(k);
 
-        double convergeDist = 0.00001;
+        double convergeDist = 0.0001;
         double tempDistance = convergeDist + 0.1;
 
         // delete the output directory if exists
@@ -284,7 +284,8 @@ public class KMeans {
         return job;
     }
 
-    private static Job createUniformSamplingJob(Configuration conf, Path inputFile, Path outputDir) throws IOException {
+    private static Job createUniformSamplingJob(Configuration conf, Path inputFile, Path outputDir, int numReducerTasks) throws IOException {
+        conf.setInt("uniformSampling.nStreams", numReducerTasks);
         Job job = Job.getInstance(conf, "uniformsampling");
 
         FileInputFormat.addInputPath(job, inputFile);
@@ -299,7 +300,8 @@ public class KMeans {
         job.setMapOutputValueClass(Text.class);
         job.setOutputKeyClass(NullWritable.class);
         job.setOutputValueClass(Point.class);
-
+        
+        job.setNumReduceTasks(numReducerTasks);
         return job;
     }
 
@@ -326,7 +328,7 @@ public class KMeans {
             fs.delete(outputDir, true);
         }
         while (i < k){
-            Job job = createUniformSamplingJob(conf, inputFile, outputDir);
+            Job job = createUniformSamplingJob(conf, inputFile, outputDir, k-i);
             job.waitForCompletion(true);
             //prelevare i punti e aggiungerli alla lista
             List<Path> outputFiles = getOutputFiles(fs, outputDir);
