@@ -30,9 +30,9 @@ import org.apache.hadoop.util.GenericOptionsParser;
 
 public class KMeans {
 
-    private static String outputCentroids = "centroids.txt";
-    private static String inputPoints = "data.txt";
-    private static String KMeansDir = "output";
+    private static String outputName = "centroids.txt";
+    private static String inputName = "data.txt";
+    private static String KMeansDirName = "KMeansTemporary";
     //part-00000 or part-r-00000 are ok
     private static final Pattern pattern = Pattern.compile("part-(r-)?[\\d]{5}"); 
 
@@ -50,7 +50,7 @@ public class KMeans {
 
             centroids = new ArrayList<>(k);
 
-            Path cache = new Path(outputCentroids);
+            Path cache = new Path(outputName);
             FileSystem fs = cache.getFileSystem(context.getConfiguration());
 
             // read centroids from cache
@@ -153,27 +153,24 @@ public class KMeans {
         /*  
             otherArgs[0] = d;
             otherArgs[1] = k;
-            otherArgs[2] = inputPoints
-            otherArgs[3] = KMeansDir
-            otherArgs[4] = outputCentroids
-            outputDirSamplingName può essere construito concatenando KMeansDir con "Sampling"
+            otherArgs[2] = inputName
+            otherArgs[3] = outputName
+            KMeansSamplingDirName può essere construito concatenando KMeansDir con "Sampling"
         */
         int d = 6;
         int k = 3;
         /*
         if (otherArgs.length < 2){
-            System.out.println("KMeans [d k inputName outputDirName outputName]");
+            System.out.println("KMeans [d k inputName KMeansDirName outputName]");
         }
         */
 
         switch(otherArgs.length){
             default:
-            case 5:
-                outputCentroids = otherArgs[4];
             case 4:
-                KMeansDir = otherArgs[3];
+                outputName = otherArgs[3];
             case 3:
-                inputPoints = otherArgs[2];
+                inputName = otherArgs[2];
             case 2:
                 k = Integer.parseInt(otherArgs[1]);
             case 1:
@@ -183,19 +180,20 @@ public class KMeans {
                 System.out.println("Caso default");
         }
         System.out.println("Uso parametri d = " + Integer.toString(d) + ", k = " + Integer.toString(k));
+        System.out.println("Nome file input = " + inputName + ", file output = " + outputName);
         Configuration conf = new Configuration();
         conf.setInt("kmeans.d", d);
         conf.setInt("kmeans.k", k);
 
-        Path inputFile = new Path(inputPoints);
-        Path outputFile = new Path(outputCentroids);
-        Path outputDir = new Path(KMeansDir);
-        Path outputDirSampling = new Path(KMeansDir + "UniformSampling");
+        Path inputFile = new Path(inputName);
+        Path outputFile = new Path(outputName);
+        Path KMeansDir = new Path(KMeansDirName);
+        Path KMeansSamplingDir = new Path(KMeansDirName + "UniformSampling");
         FileSystem fs = FileSystem.get(conf);
 
 
         // select initial centroids and write them to file
-        List<Point> centroids = getRandomCentroids(conf, k, fs, inputFile, outputDirSampling);
+        List<Point> centroids = getRandomCentroids(conf, k, fs, inputFile, KMeansSamplingDir);
         updateCache(centroids, fs, outputFile);
         boolean success = true;
         int iteration = 1;
@@ -204,18 +202,19 @@ public class KMeans {
 
         double convergeDist = 0.00001;
         double tempDistance = convergeDist + 0.1;
+
+        // delete the output directory if exists
+        if (fs.exists(KMeansDir))
+            fs.delete(KMeansDir, true);
         
         while (success && tempDistance > convergeDist && iteration <= 10) {
 
-            // delete the output directory if exists
-            if (fs.exists(outputDir))
-                fs.delete(outputDir, true);
 
             // new job to compute new centroids
-            Job kmeansJob = createKMeansJob(conf, inputFile, outputDir);
+            Job kmeansJob = createKMeansJob(conf, inputFile, KMeansDir);
             success = kmeansJob.waitForCompletion(true);
             // add new centroids to list
-            readCentroidsFromOutput(newCentroids, fs, outputDir);
+            readCentroidsFromOutput(newCentroids, fs, KMeansDir);
 
             System.out.println("New centroids " + iteration + ":");
             for (Point point : newCentroids)
@@ -235,6 +234,9 @@ public class KMeans {
 
             iteration++;
             System.out.println("tempDistance = " + Double.toString(tempDistance)); // DEBUG
+            // delete the output directory if exists
+            if (fs.exists(KMeansDir))
+                fs.delete(KMeansDir, true);
         }
         System.exit(success ? 0 : 1);
     }
@@ -358,12 +360,12 @@ public class KMeans {
         return centroids;
     }
 
-    private static void readCentroidsFromOutput(List<Point> list, FileSystem fs, Path dir) throws Exception{
+    private static void readCentroidsFromOutput(List<Point> list, FileSystem fs, Path outputDir) throws Exception{
 
         list.clear();
 
         WritableWrapper wrapper;
-        List<Path> listOutputFiles = getOutputFiles(fs, dir);
+        List<Path> listOutputFiles = getOutputFiles(fs, outputDir);
         for (Path file: listOutputFiles){
             try (FSDataInputStream fileStream = fs.open(file);
                     BufferedReader reader = new BufferedReader(new InputStreamReader(fileStream))) {
