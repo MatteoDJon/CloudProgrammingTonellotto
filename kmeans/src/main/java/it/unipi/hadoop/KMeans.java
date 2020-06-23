@@ -211,7 +211,7 @@ public class KMeans {
 
 
             // new job to compute new centroids
-            Job kmeansJob = createKMeansJob(conf, inputFile, KMeansDir);
+            Job kmeansJob = createKMeansJob(conf, inputFile, KMeansDir, k);
             success = kmeansJob.waitForCompletion(true);
             // add new centroids to list
             readCentroidsFromOutput(newCentroids, fs, KMeansDir);
@@ -265,7 +265,7 @@ public class KMeans {
         return tempDistance;
     }
 
-    private static Job createKMeansJob(Configuration conf, Path inputFile, Path outputDir) throws IOException {
+    private static Job createKMeansJob(Configuration conf, Path inputFile, Path outputDir, int numReducerTasks) throws IOException {
         Job job = Job.getInstance(conf, "kmeans");
 
         FileInputFormat.addInputPath(job, inputFile);
@@ -280,7 +280,7 @@ public class KMeans {
         job.setMapOutputValueClass(WritableWrapper.class);
         job.setOutputKeyClass(IntWritable.class);
         job.setOutputValueClass(WritableWrapper.class);
-
+        job.setNumReduceTasks(numReducerTasks);
         return job;
     }
 
@@ -376,6 +376,7 @@ public class KMeans {
                 while ((line = reader.readLine()) != null) {
 
                     String[] split = line.split("\t"); // split key and value
+                    Integer position = Integer.parseInt(split[0]); //key in the list
                     String value = split[1]; // get wrapper string
 
                     wrapper = WritableWrapper.parseString(value);
@@ -385,7 +386,12 @@ public class KMeans {
                     Point centroid = wrapper.getPoint();
                     centroid.divide(count);
 
-                    list.add(centroid);
+                    // Don't know if I can trust the position of the files for the new clusters
+                    //Important: I assume that a key starts from 0 (really important)
+                    while (list.size() <= position){
+                        list.add(null);
+                    }
+                    list.set(position, centroid);
                 }
 
             } catch (IOException | ParseException e) {
