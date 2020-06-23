@@ -69,16 +69,23 @@ public class Point implements Writable {
             this.point[i] = this.point[i] / scalar;
     }
 
-    public double computeDistance(Point that) {
+    public double computeSquaredDistance(Point that) {
 
-        double distance, sum = 0;
+        double sum = 0;
 
         for (int i = 0; i < getDimension(); i++)
             sum += Math.pow(this.point[i] - that.point[i], 2);
 
-        distance = Math.sqrt(sum);
+        return sum;
+    }
 
-        return distance;
+    public double computeSquaredNorm() {
+        double squaredNorm = 0;
+
+        for (int i = 0; i < this.point.length; i++)
+            squaredNorm += this.point[i] * this.point[i];
+
+        return squaredNorm;
     }
 
     @Override
