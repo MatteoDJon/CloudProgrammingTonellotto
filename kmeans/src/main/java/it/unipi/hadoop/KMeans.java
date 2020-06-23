@@ -8,12 +8,16 @@ import java.io.OutputStreamWriter;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.Text;
@@ -27,8 +31,11 @@ public class KMeans {
 
     private static final String cacheName = "centroids.txt";
     private static final String inputName = "data.txt";
-    private static final String outputDirName = "output";
+    private static final String outputDirName = "output/";
     private static final String outputName = "output/part-r-00000";
+    private static final String outputDirSamplingName = "outputSampling/";
+    //part-00000 or part-r-00000 are ok
+    private static final Pattern pattern = Pattern.compile("part-(r-)?[\\d]{5}"); 
 
     public static class KMeansMapper extends Mapper<Object, Text, IntWritable, WritableWrapper> {
 
@@ -99,7 +106,7 @@ public class KMeans {
 
                 // emit <clusterId, point>
                 outputKey.set(nearestClusterId);
-                outputValue.setPoint(point);
+                outputValue.setPoint(point).setCount(1);
                 context.write(outputKey, outputValue);
 
             } catch (ParseException e) {
@@ -154,20 +161,20 @@ public class KMeans {
         Path cacheFile = new Path(cacheName);
         Path outputDir = new Path(outputDirName);
         Path outputFile = new Path(outputName);
+        Path outputDirSampling = new Path(outputDirSamplingName);
+        FileSystem fs = FileSystem.get(conf);
 
-        FileSystem fs = inputFile.getFileSystem(conf);
 
         // select initial centroids and write them to file
-        List<Point> centroids = getRandomCentroids(conf, k, fs, inputFile, outputDir, cacheFile);
+        List<Point> centroids = getRandomCentroids(conf, k, fs, inputFile, outputDirSampling);
         updateCache(centroids, fs, cacheFile);
-
         boolean success = true;
         int iteration = 1;
-        List<Point> oldCentroids = centroids;
+        List<Point> currentCentroids = centroids;
         List<Point> newCentroids = new ArrayList<>(k);
 
-        double convergeDist = 0.1;
-        double tempDistance = 0.0;
+        double convergeDist = 0.00001;
+        double tempDistance = convergeDist + 0.1;
         
         while (success && tempDistance > convergeDist && iteration <= 10) {
 
@@ -178,7 +185,6 @@ public class KMeans {
             // new job to compute new centroids
             Job kmeansJob = createKMeansJob(conf, inputFile, outputDir);
             success = kmeansJob.waitForCompletion(true);
-
             // add new centroids to list
             readCentroidsFromOutput(newCentroids, fs, outputFile);
 
@@ -190,16 +196,20 @@ public class KMeans {
             updateCache(newCentroids, fs, cacheFile);
 
             // sum of all the relative errors between old centroids and new centroids
-            tempDistance = compareCentroids(oldCentroids, newCentroids);
+            
+            tempDistance = compareCentroids(currentCentroids, newCentroids);
             
             // before next iteration update old centroids list
-            oldCentroids = newCentroids;
+            List<Point> tempList = currentCentroids;
+            currentCentroids = newCentroids;
+            newCentroids = tempList;
 
             iteration++;
+            System.out.println("tempDistance = " + Double.toString(tempDistance)); // DEBUG
         }
-
         System.exit(success ? 0 : 1);
     }
+
 
     private static double compareCentroids(List<Point> oldCentroids, List<Point> newCentroids) {
         // precondizione: i centroidi sono, rispetto alla singola posizione,
@@ -262,17 +272,38 @@ public class KMeans {
         return job;
     }
 
-    private static List<Point> getRandomCentroids(Configuration conf, int k, FileSystem fs, Path inputFile, Path outputDir, Path cacheFile) throws Exception{
+    private static List<Path> getOutputFiles(FileSystem fs, Path outputDir) throws Exception {
+        List<Path> listPaths = new ArrayList<>();
+        Matcher matcher;
+        RemoteIterator<LocatedFileStatus> rit = fs.listFiles(outputDir, false);
+        while (rit.hasNext()){
+            Path outputFile = rit.next().getPath();
+            matcher = pattern.matcher(outputFile.toString());
+            if (matcher.find()){
+                listPaths.add(outputFile);
+            }
+        }
+        return listPaths;
+
+    }
+    private static List<Point> getRandomCentroids(Configuration conf, int k, FileSystem fs, Path inputFile, Path outputDir) throws Exception {
 
         List<Point> centroids = new ArrayList<>(k);
-        Job job = createUniformSamplingJob(conf, inputFile, outputDir);
-        Path outputFile = new Path(outputDir, "part-r-00000");
         int i = 0;
+        //simple control, just in case
+        if (fs.exists(outputDir)){
+            fs.delete(outputDir, true);
+        }
         while (i < k){
+            Job job = createUniformSamplingJob(conf, inputFile, outputDir);
             job.waitForCompletion(true);
             //prelevare i punti e aggiungerli alla lista
-            try (FSDataInputStream stream = fs.open(outputFile); 
-                BufferedReader reader = new BufferedReader(new InputStreamReader(stream))) {
+            List<Path> outputFiles = getOutputFiles(fs, outputDir);
+            
+            for (Path outputFile : outputFiles){
+                try (FSDataInputStream stream = fs.open(outputFile); 
+                BufferedReader reader = new BufferedReader(new InputStreamReader(stream)))
+                {
                     Point p = Point.parseString(reader.readLine());
                     boolean unique = true;
                     for (Point c : centroids) {
@@ -283,33 +314,19 @@ public class KMeans {
                     }
                     if (unique) {
                         centroids.add(p);
-                        ++i;
+                            ++i;
+                        }
                     }
-
+                catch (Exception e){
+                    e.printStackTrace();
+                }
             }
-            catch (Exception e){
-                e.printStackTrace();
-            }
-            if (fs.exists(outputDir))
+            if (fs.exists(outputDir)){
                 fs.delete(outputDir, true);
+            }
         }
+
         return centroids;
-        /*
-        // TODO improve random selection of centroids
-
-        try (FSDataInputStream stream = fs.open(file);
-                BufferedReader reader = new BufferedReader(new InputStreamReader(stream))) {
-
-            // read k lines, parse, use as centroids
-            for (int i = 0; i < k; i++)
-                centroids.add(Point.parseString(reader.readLine()));
-
-        } catch (IOException | ParseException e) {
-            // TODO handle exception
-        }
-        return centroids;
-        */
-
     }
 
     private static void readCentroidsFromOutput(List<Point> list, FileSystem fs, Path file) {
