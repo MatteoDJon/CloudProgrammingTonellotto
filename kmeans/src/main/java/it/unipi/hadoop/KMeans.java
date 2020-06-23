@@ -26,14 +26,13 @@ import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+import org.apache.hadoop.util.GenericOptionsParser;
 
 public class KMeans {
 
-    private static final String cacheName = "centroids.txt";
-    private static final String inputName = "data.txt";
-    private static final String outputDirName = "output/";
-    private static final String outputName = "output/part-r-00000";
-    private static final String outputDirSamplingName = "outputSampling/";
+    private static String outputCentroids = "centroids.txt";
+    private static String inputPoints = "data.txt";
+    private static String KMeansDir = "output";
     //part-00000 or part-r-00000 are ok
     private static final Pattern pattern = Pattern.compile("part-(r-)?[\\d]{5}"); 
 
@@ -51,7 +50,7 @@ public class KMeans {
 
             centroids = new ArrayList<>(k);
 
-            Path cache = new Path(cacheName);
+            Path cache = new Path(outputCentroids);
             FileSystem fs = cache.getFileSystem(context.getConfiguration());
 
             // read centroids from cache
@@ -150,24 +149,54 @@ public class KMeans {
     }
 
     public static void main(String[] args) throws Exception {
+        String[] otherArgs = new GenericOptionsParser(args).getRemainingArgs();
+        /*  
+            otherArgs[0] = d;
+            otherArgs[1] = k;
+            otherArgs[2] = inputPoints
+            otherArgs[3] = KMeansDir
+            otherArgs[4] = outputCentroids
+            outputDirSamplingName può essere construito concatenando KMeansDir con "Sampling"
+        */
         int d = 6;
         int k = 3;
-        
+        /*
+        if (otherArgs.length < 2){
+            System.out.println("KMeans [d k inputName outputDirName outputName]");
+        }
+        */
+
+        switch(otherArgs.length){
+            default:
+            case 5:
+                outputCentroids = otherArgs[4];
+            case 4:
+                KMeansDir = otherArgs[3];
+            case 3:
+                inputPoints = otherArgs[2];
+            case 2:
+                k = Integer.parseInt(otherArgs[1]);
+            case 1:
+                d = Integer.parseInt(otherArgs[0]);
+                break;
+            case 0:
+                System.out.println("Caso default");
+        }
+        System.out.println("Uso parametri d = " + Integer.toString(d) + ", k = " + Integer.toString(k));
         Configuration conf = new Configuration();
         conf.setInt("kmeans.d", d);
         conf.setInt("kmeans.k", k);
 
-        Path inputFile = new Path(inputName);
-        Path cacheFile = new Path(cacheName);
-        Path outputDir = new Path(outputDirName);
-        Path outputFile = new Path(outputName);
-        Path outputDirSampling = new Path(outputDirSamplingName);
+        Path inputFile = new Path(inputPoints);
+        Path outputFile = new Path(outputCentroids);
+        Path outputDir = new Path(KMeansDir);
+        Path outputDirSampling = new Path(KMeansDir + "UniformSampling");
         FileSystem fs = FileSystem.get(conf);
 
 
         // select initial centroids and write them to file
         List<Point> centroids = getRandomCentroids(conf, k, fs, inputFile, outputDirSampling);
-        updateCache(centroids, fs, cacheFile);
+        updateCache(centroids, fs, outputFile);
         boolean success = true;
         int iteration = 1;
         List<Point> currentCentroids = centroids;
@@ -186,14 +215,14 @@ public class KMeans {
             Job kmeansJob = createKMeansJob(conf, inputFile, outputDir);
             success = kmeansJob.waitForCompletion(true);
             // add new centroids to list
-            readCentroidsFromOutput(newCentroids, fs, outputFile);
+            readCentroidsFromOutput(newCentroids, fs, outputDir);
 
             System.out.println("New centroids " + iteration + ":");
             for (Point point : newCentroids)
                 System.out.println("\t" + point);
 
             // write new centroids to file read from mapper
-            updateCache(newCentroids, fs, cacheFile);
+            updateCache(newCentroids, fs, outputFile);
 
             // sum of all the relative errors between old centroids and new centroids
             
@@ -329,34 +358,36 @@ public class KMeans {
         return centroids;
     }
 
-    private static void readCentroidsFromOutput(List<Point> list, FileSystem fs, Path file) {
+    private static void readCentroidsFromOutput(List<Point> list, FileSystem fs, Path dir) throws Exception{
 
         list.clear();
 
         WritableWrapper wrapper;
+        List<Path> listOutputFiles = getOutputFiles(fs, dir);
+        for (Path file: listOutputFiles){
+            try (FSDataInputStream fileStream = fs.open(file);
+                    BufferedReader reader = new BufferedReader(new InputStreamReader(fileStream))) {
 
-        try (FSDataInputStream fileStream = fs.open(file);
-                BufferedReader reader = new BufferedReader(new InputStreamReader(fileStream))) {
+                String line = null;
+                while ((line = reader.readLine()) != null) {
 
-            String line = null;
-            while ((line = reader.readLine()) != null) {
+                    String[] split = line.split("\t"); // split key and value
+                    String value = split[1]; // get wrapper string
 
-                String[] split = line.split("\t"); // split key and value
-                String value = split[1]; // get wrapper string
+                    wrapper = WritableWrapper.parseString(value);
 
-                wrapper = WritableWrapper.parseString(value);
+                    // divide to compute mean point
+                    int count = wrapper.getCount();
+                    Point centroid = wrapper.getPoint();
+                    centroid.divide(count);
 
-                // divide to compute mean point
-                int count = wrapper.getCount();
-                Point centroid = wrapper.getPoint();
-                centroid.divide(count);
+                    list.add(centroid);
+                }
 
-                list.add(centroid);
+            } catch (IOException | ParseException e) {
+                // TODO handle exception
+                System.err.println("Exception: " + e.getMessage());
             }
-
-        } catch (IOException | ParseException e) {
-            // TODO handle exception
-            System.err.println("Exception: " + e.getMessage());
         }
 
         // TODO maybe check if centroids are not k
