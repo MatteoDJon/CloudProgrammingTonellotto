@@ -10,7 +10,7 @@ import java.util.StringTokenizer;
 import org.apache.hadoop.io.ArrayPrimitiveWritable;
 import org.apache.hadoop.io.Writable;
 
-public class Point implements Writable {
+class Point implements Writable {
 
     private double[] point;
 
@@ -136,4 +136,5 @@ public class Point implements Writable {
         p.readFields(in);
         return p;
     }
+
 }

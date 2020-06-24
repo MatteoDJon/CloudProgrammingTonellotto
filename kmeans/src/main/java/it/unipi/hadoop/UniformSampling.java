@@ -1,15 +1,20 @@
 package it.unipi.hadoop;
 
-import java.util.concurrent.ThreadLocalRandom;
 import java.io.IOException;
+import java.util.concurrent.ThreadLocalRandom;
 
-import org.apache.hadoop.io.Text;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.NullWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 
-public class UniformSampling {
+class UniformSampling {
 
     public static class UniformMapper extends Mapper<Object, Text, IntWritable, Text> {
 
@@ -43,5 +48,26 @@ public class UniformSampling {
             p.set(str);
             context.write(NullWritable.get(), p);
         }
+    }
+
+    static Job createUniformSamplingJob(Configuration conf, Path inputFile, Path outputDir, int nStreams) throws IOException {
+        conf.setInt("uniformSampling.nStreams", nStreams);
+        Job job = Job.getInstance(conf, "uniformsampling");
+
+        FileInputFormat.addInputPath(job, inputFile);
+        FileOutputFormat.setOutputPath(job, outputDir);
+
+        job.setJarByClass(UniformSampling.class);
+
+        job.setMapperClass(UniformSampling.UniformMapper.class);
+        job.setReducerClass(UniformSampling.UniformReducer.class);
+
+        job.setMapOutputKeyClass(IntWritable.class);
+        job.setMapOutputValueClass(Text.class);
+        job.setOutputKeyClass(NullWritable.class);
+        job.setOutputValueClass(Text.class);
+        
+        job.setNumReduceTasks(nStreams);
+        return job;
     }
 }

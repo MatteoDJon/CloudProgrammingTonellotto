@@ -9,7 +9,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.Writable;
 
-public class WritableWrapper implements Writable {
+class WritableWrapper implements Writable {
 
     private Point p;
     private IntWritable count = new IntWritable();
