@@ -151,20 +151,15 @@ public class KMeans {
     public static void main(String[] args) throws Exception {
         String[] otherArgs = new GenericOptionsParser(args).getRemainingArgs();
         /*  
+            List of arguments = [dimensionPoints numberClusteroids pointsPath finalCentroidsPath];
             otherArgs[0] = d;
             otherArgs[1] = k;
             otherArgs[2] = inputName
             otherArgs[3] = outputName
             KMeansSamplingDirName può essere construito concatenando KMeansDir con "Sampling"
         */
-        int d = 6;
-        int k = 3;
-        /*
-        if (otherArgs.length < 2){
-            System.out.println("KMeans [d k inputName KMeansDirName outputName]");
-        }
-        */
-
+        int d = 6; // default
+        int k = 3; // default
         switch(otherArgs.length){
             default:
             case 4:
@@ -200,7 +195,7 @@ public class KMeans {
         List<Point> currentCentroids = centroids;
         List<Point> newCentroids = new ArrayList<>(k);
 
-        double convergeDist = 0.0001;
+        double convergeDist = 0.001;
         double tempDistance = convergeDist + 0.1;
 
         // delete the output directory if exists
@@ -299,7 +294,7 @@ public class KMeans {
         job.setMapOutputKeyClass(IntWritable.class);
         job.setMapOutputValueClass(Text.class);
         job.setOutputKeyClass(NullWritable.class);
-        job.setOutputValueClass(Point.class);
+        job.setOutputValueClass(Text.class);
         
         job.setNumReduceTasks(numReducerTasks);
         return job;

@@ -25,24 +25,22 @@ public class UniformSampling {
         }
     }
 
-    public static class UniformReducer extends Reducer<IntWritable, Text, NullWritable, Point> {
+    public static class UniformReducer extends Reducer<IntWritable, Text, NullWritable, Text> {
+
+        private static final Text p = new Text();
 
         public void reduce(final IntWritable key, final Iterable<Text> value, final Context context)
                 throws IOException, InterruptedException {
-            Point p = null;
+            String str = null;
             long k = 0;
             for (Text t : value) {
-                try {
-                    Point temp = Point.parseString(t.toString());
-                    ++k;
-                    double random = ThreadLocalRandom.current().nextDouble(0, 1);
-                    if (random < ((double) 1 / k))
-                        p = temp;
-                } catch (Exception e) {
-                    e.printStackTrace();
+                ++k;
+                double random = ThreadLocalRandom.current().nextDouble(0, 1);
+                if (random < ((double) 1 / k)){
+                    str = t.toString(); //returns a new string
                 }
-
             }
+            p.set(str);
             context.write(NullWritable.get(), p);
         }
     }
