@@ -26,14 +26,13 @@ import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+import org.apache.hadoop.util.GenericOptionsParser;
 
 public class KMeans {
 
-    private static final String cacheName = "centroids.txt";
-    private static final String inputName = "data.txt";
-    private static final String outputDirName = "output/";
-    private static final String outputName = "output/part-r-00000";
-    private static final String outputDirSamplingName = "outputSampling/";
+    private static String outputName = "centroids.txt";
+    private static String inputName = "data.txt";
+    private static String KMeansDirName = "KMeansTemporary";
     //part-00000 or part-r-00000 are ok
     private static final Pattern pattern = Pattern.compile("part-(r-)?[\\d]{5}"); 
 
@@ -51,7 +50,7 @@ public class KMeans {
 
             centroids = new ArrayList<>(k);
 
-            Path cache = new Path(cacheName);
+            Path cache = new Path(outputName);
             FileSystem fs = cache.getFileSystem(context.getConfiguration());
 
             // read centroids from cache
@@ -150,50 +149,74 @@ public class KMeans {
     }
 
     public static void main(String[] args) throws Exception {
-        int d = 6;
-        int k = 3;
-        
+        String[] otherArgs = new GenericOptionsParser(args).getRemainingArgs();
+        /*  
+            List of arguments = [dimensionPoints numberClusteroids pointsPath finalCentroidsPath];
+            otherArgs[0] = d;
+            otherArgs[1] = k;
+            otherArgs[2] = inputName
+            otherArgs[3] = outputName
+            KMeansSamplingDirName può essere construito concatenando KMeansDir con "Sampling"
+        */
+        int d = 6; // default
+        int k = 3; // default
+        switch(otherArgs.length){
+            default:
+            case 4:
+                outputName = otherArgs[3];
+            case 3:
+                inputName = otherArgs[2];
+            case 2:
+                k = Integer.parseInt(otherArgs[1]);
+            case 1:
+                d = Integer.parseInt(otherArgs[0]);
+                break;
+            case 0:
+                System.out.println("Caso default");
+        }
+        System.out.println("Uso parametri d = " + Integer.toString(d) + ", k = " + Integer.toString(k));
+        System.out.println("Nome file input = " + inputName + ", file output = " + outputName);
         Configuration conf = new Configuration();
         conf.setInt("kmeans.d", d);
         conf.setInt("kmeans.k", k);
 
         Path inputFile = new Path(inputName);
-        Path cacheFile = new Path(cacheName);
-        Path outputDir = new Path(outputDirName);
         Path outputFile = new Path(outputName);
-        Path outputDirSampling = new Path(outputDirSamplingName);
+        Path KMeansDir = new Path(KMeansDirName);
+        Path KMeansSamplingDir = new Path(KMeansDirName + "UniformSampling");
         FileSystem fs = FileSystem.get(conf);
 
 
         // select initial centroids and write them to file
-        List<Point> centroids = getRandomCentroids(conf, k, fs, inputFile, outputDirSampling);
-        updateCache(centroids, fs, cacheFile);
+        List<Point> centroids = getRandomCentroids(conf, k, fs, inputFile, KMeansSamplingDir);
+        updateCache(centroids, fs, outputFile);
         boolean success = true;
         int iteration = 1;
         List<Point> currentCentroids = centroids;
         List<Point> newCentroids = new ArrayList<>(k);
 
-        double convergeDist = 0.00001;
+        double convergeDist = 0.001;
         double tempDistance = convergeDist + 0.1;
+
+        // delete the output directory if exists
+        if (fs.exists(KMeansDir))
+            fs.delete(KMeansDir, true);
         
         while (success && tempDistance > convergeDist && iteration <= 10) {
 
-            // delete the output directory if exists
-            if (fs.exists(outputDir))
-                fs.delete(outputDir, true);
 
             // new job to compute new centroids
-            Job kmeansJob = createKMeansJob(conf, inputFile, outputDir);
+            Job kmeansJob = createKMeansJob(conf, inputFile, KMeansDir, k);
             success = kmeansJob.waitForCompletion(true);
             // add new centroids to list
-            readCentroidsFromOutput(newCentroids, fs, outputFile);
+            readCentroidsFromOutput(newCentroids, fs, KMeansDir);
 
             System.out.println("New centroids " + iteration + ":");
             for (Point point : newCentroids)
                 System.out.println("\t" + point);
 
             // write new centroids to file read from mapper
-            updateCache(newCentroids, fs, cacheFile);
+            updateCache(newCentroids, fs, outputFile);
 
             // sum of all the relative errors between old centroids and new centroids
             
@@ -206,6 +229,9 @@ public class KMeans {
 
             iteration++;
             System.out.println("tempDistance = " + Double.toString(tempDistance)); // DEBUG
+            // delete the output directory if exists
+            if (fs.exists(KMeansDir))
+                fs.delete(KMeansDir, true);
         }
         System.exit(success ? 0 : 1);
     }
@@ -234,7 +260,7 @@ public class KMeans {
         return tempDistance;
     }
 
-    private static Job createKMeansJob(Configuration conf, Path inputFile, Path outputDir) throws IOException {
+    private static Job createKMeansJob(Configuration conf, Path inputFile, Path outputDir, int numReducerTasks) throws IOException {
         Job job = Job.getInstance(conf, "kmeans");
 
         FileInputFormat.addInputPath(job, inputFile);
@@ -249,11 +275,12 @@ public class KMeans {
         job.setMapOutputValueClass(WritableWrapper.class);
         job.setOutputKeyClass(IntWritable.class);
         job.setOutputValueClass(WritableWrapper.class);
-
+        job.setNumReduceTasks(numReducerTasks);
         return job;
     }
 
-    private static Job createUniformSamplingJob(Configuration conf, Path inputFile, Path outputDir) throws IOException {
+    private static Job createUniformSamplingJob(Configuration conf, Path inputFile, Path outputDir, int numReducerTasks) throws IOException {
+        conf.setInt("uniformSampling.nStreams", numReducerTasks);
         Job job = Job.getInstance(conf, "uniformsampling");
 
         FileInputFormat.addInputPath(job, inputFile);
@@ -267,8 +294,9 @@ public class KMeans {
         job.setMapOutputKeyClass(IntWritable.class);
         job.setMapOutputValueClass(Text.class);
         job.setOutputKeyClass(NullWritable.class);
-        job.setOutputValueClass(Point.class);
-
+        job.setOutputValueClass(Text.class);
+        
+        job.setNumReduceTasks(numReducerTasks);
         return job;
     }
 
@@ -295,7 +323,7 @@ public class KMeans {
             fs.delete(outputDir, true);
         }
         while (i < k){
-            Job job = createUniformSamplingJob(conf, inputFile, outputDir);
+            Job job = createUniformSamplingJob(conf, inputFile, outputDir, k-i);
             job.waitForCompletion(true);
             //prelevare i punti e aggiungerli alla lista
             List<Path> outputFiles = getOutputFiles(fs, outputDir);
@@ -329,34 +357,42 @@ public class KMeans {
         return centroids;
     }
 
-    private static void readCentroidsFromOutput(List<Point> list, FileSystem fs, Path file) {
+    private static void readCentroidsFromOutput(List<Point> list, FileSystem fs, Path outputDir) throws Exception{
 
         list.clear();
 
         WritableWrapper wrapper;
+        List<Path> listOutputFiles = getOutputFiles(fs, outputDir);
+        for (Path file: listOutputFiles){
+            try (FSDataInputStream fileStream = fs.open(file);
+                    BufferedReader reader = new BufferedReader(new InputStreamReader(fileStream))) {
 
-        try (FSDataInputStream fileStream = fs.open(file);
-                BufferedReader reader = new BufferedReader(new InputStreamReader(fileStream))) {
+                String line = null;
+                while ((line = reader.readLine()) != null) {
 
-            String line = null;
-            while ((line = reader.readLine()) != null) {
+                    String[] split = line.split("\t"); // split key and value
+                    Integer position = Integer.parseInt(split[0]); //key in the list
+                    String value = split[1]; // get wrapper string
 
-                String[] split = line.split("\t"); // split key and value
-                String value = split[1]; // get wrapper string
+                    wrapper = WritableWrapper.parseString(value);
 
-                wrapper = WritableWrapper.parseString(value);
+                    // divide to compute mean point
+                    int count = wrapper.getCount();
+                    Point centroid = wrapper.getPoint();
+                    centroid.divide(count);
 
-                // divide to compute mean point
-                int count = wrapper.getCount();
-                Point centroid = wrapper.getPoint();
-                centroid.divide(count);
+                    // Don't know if I can trust the position of the files for the new clusters
+                    //Important: I assume that a key starts from 0 (really important)
+                    while (list.size() <= position){
+                        list.add(null);
+                    }
+                    list.set(position, centroid);
+                }
 
-                list.add(centroid);
+            } catch (IOException | ParseException e) {
+                // TODO handle exception
+                System.err.println("Exception: " + e.getMessage());
             }
-
-        } catch (IOException | ParseException e) {
-            // TODO handle exception
-            System.err.println("Exception: " + e.getMessage());
         }
 
         // TODO maybe check if centroids are not k

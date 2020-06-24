@@ -13,38 +13,34 @@ public class UniformSampling {
 
     public static class UniformMapper extends Mapper<Object, Text, IntWritable, Text> {
 
-        private final IntWritable one = new IntWritable(1);
+        private static final IntWritable keyInt = new IntWritable();
 
-        public void map(final Object key, final Text value, final Context context)
-                throws IOException, InterruptedException {
-            /*
-             * IntWritable v = new IntWritable(); int numeroVolte =
-             * context.getConfiguration().getInt("k", 1); for (int i = 1; i <= numeroVolte;
-             * ++i){ v.set(i); //oppure setInt context.write(v, value); }
-             */
-            context.write(one, value);
+        public void map(final Object key, final Text value, final Context context) throws IOException, InterruptedException {
+
+            int nStreams = context.getConfiguration().getInt("uniformSampling.nStreams", 1);
+            for (int i = 0; i < nStreams; ++i){
+                keyInt.set(i);
+                context.write(keyInt, value);
+            }
         }
-
     }
 
-    public static class UniformReducer extends Reducer<IntWritable, Text, NullWritable, Point> {
+    public static class UniformReducer extends Reducer<IntWritable, Text, NullWritable, Text> {
+
+        private static final Text p = new Text();
 
         public void reduce(final IntWritable key, final Iterable<Text> value, final Context context)
                 throws IOException, InterruptedException {
-            Point p = null;
+            String str = null;
             long k = 0;
             for (Text t : value) {
-                try {
-                    Point temp = Point.parseString(t.toString());
-                    ++k;
-                    double random = ThreadLocalRandom.current().nextDouble(0, 1);
-                    if (random < ((double) 1 / k))
-                        p = temp;
-                } catch (Exception e) {
-                    e.printStackTrace();
+                ++k;
+                double random = ThreadLocalRandom.current().nextDouble(0, 1);
+                if (random < ((double) 1 / k)){
+                    str = t.toString(); //returns a new string
                 }
-
             }
+            p.set(str);
             context.write(NullWritable.get(), p);
         }
     }
