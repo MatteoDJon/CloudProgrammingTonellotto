@@ -52,7 +52,7 @@ public class Driver {
             fs.delete(outputDir, true);
         }
         while (i < k){
-            Job job = UniformSampling.createUniformSamplingJob(conf, inputFile, outputDir, k-i);
+            Job job = UniformSampling.createUniformSamplingJob(conf, inputFile, outputDir, 1);
             job.waitForCompletion(true);
             //prelevare i punti e aggiungerli alla lista
             List<Path> outputFiles = getOutputFiles(fs, outputDir);

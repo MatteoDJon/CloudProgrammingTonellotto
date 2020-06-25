@@ -149,7 +149,7 @@ class KMeans {
 
         job.setMapperClass(KMeansMapper.class);
         job.setReducerClass(KMeansReducer.class);
-        // job.setCombinerClass(KMeansReducer.class);
+        job.setCombinerClass(KMeansReducer.class);
         job.setMapOutputKeyClass(IntWritable.class);
         job.setMapOutputValueClass(WritableWrapper.class);
         job.setOutputKeyClass(IntWritable.class);
