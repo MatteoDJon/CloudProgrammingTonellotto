@@ -23,6 +23,9 @@ import org.apache.hadoop.util.GenericOptionsParser;
 
 public class Driver {
     
+    private static final double convergeDist = 1e-9;
+    private static final int maxIterations = 100;
+
     private static String outputName = "centroids.txt";
     private static String inputName = "data.txt";
     private static String KMeansDirName = "KMeansTemporary";
@@ -192,6 +195,9 @@ public class Driver {
         }
         System.out.println("Uso parametri d = " + Integer.toString(d) + ", k = " + Integer.toString(k));
         System.out.println("Nome file input = " + inputName + ", file output = " + outputName);
+        
+        long startTime = System.currentTimeMillis();
+
 
         Configuration conf = new Configuration();
         Path inputFile = new Path(inputName);
@@ -208,14 +214,15 @@ public class Driver {
         List<Point> currentCentroids = centroids;
         List<Point> newCentroids = new ArrayList<>(k);
 
-        double convergeDist = 0.001;
-        double tempDistance = convergeDist + 0.1;
 
         // delete the output directory if exists
         if (fs.exists(KMeansDir))
             fs.delete(KMeansDir, true);
         
-        while (success && tempDistance > convergeDist && iteration <= 10) {
+        double tempDistance = convergeDist + 0.1;            
+        long timeAlgStart = System.currentTimeMillis();
+
+        while (success && tempDistance > convergeDist && iteration <= maxIterations) {
             
             // new job to compute new centroids
             Job kmeansJob = KMeans.createKMeansJob(conf, inputFile, KMeansDir, outputFile, d, k);
@@ -223,9 +230,10 @@ public class Driver {
             // add new centroids to list
             readCentroidsFromOutput(newCentroids, fs, KMeansDir);
 
-            System.out.println("New centroids " + iteration + ":");
-            for (Point point : newCentroids)
-                System.out.println("\t" + point);
+            // DEBUG:
+            // System.out.println("New centroids " + iteration + ":");
+            // for (Point point : newCentroids)
+            //     System.out.println("\t" + point);
 
             // write new centroids to file read from mapper
             updateCache(newCentroids, fs, outputFile);
@@ -239,11 +247,20 @@ public class Driver {
             newCentroids = tempList;
 
             iteration++;
-            System.out.println("tempDistance = " + Double.toString(tempDistance)); // DEBUG
+            // System.out.println("tempDistance = " + Double.toString(tempDistance)); // DEBUG
             // delete the output directory if exists
             if (fs.exists(KMeansDir))
                 fs.delete(KMeansDir, true);
         }
+
+        long endTime = System.currentTimeMillis();
+
+        System.out.println("Tempo di inizio: " + startTime);
+        System.out.println("Tempo inizio dell'algoritmo: " + timeAlgStart ); 
+        System.out.println("Tempo di fine: " + endTime);
+        System.out.println("Durata dell'algoritmo: " + (endTime - startTime));
+
+        System.out.println("Numero di iterazioni: "+ iteration);
         System.exit(success ? 0 : 1);
     }
 }

@@ -64,18 +64,29 @@ if __name__ == "__main__":
     sc = SparkContext.getOrCreate()
     sc.addPyFile("./Point.py")
 
-    lines = sc.textFile("data.txt")
-    K = int("5")
+    K = int(sys.argv[2])
+    d = int(sys.argv[1])
+    
+    data_path = sys.argv[3]
+    output_path = sys.argv[4]
 
-    kPoints = [Point(line) for line in lines.takeSample(withReplacement=True, num=K)]
+    print("Parametri di ingresso k=" + str(K) + " d=" + str(d) + " path=" + data_path)
 
-    minError = 0.001
+    lines = sc.textFile(data_path)
+    
+    currentTime = time.time()
+    print("Tempo inizio algoritmo: " + str(currentTime))
+    startTime = currentTime
+
+    kPoints = [Point(line,d) for line in lines.takeSample(withReplacement=True, num=K)]
+
+    minError = 1e-9
     oldCentroids = []
     newCentroids = kPoints
     count = 0
-    maxIterations = 10
+    maxIterations = 40
 
-    parallelizedPoints = lines.map(lambda line: Point(line)).cache()
+    parallelizedPoints = lines.map(lambda line: Point(line,d)).cache()
 
     while(compareCentroids(oldCentroids, newCentroids) > minError and count < maxIterations):
         oldCentroids = newCentroids
@@ -114,6 +125,9 @@ if __name__ == "__main__":
             newCentroids[row[0]] = row[1]
         count += 1
 
-    currentTime = str(time.time()) # to prevent FileAlreadyExistsException
-    sc.parallelize([p.printPoint() for p in newCentroids], 1).saveAsTextFile("spark-"+currentTime+"-kmeans")
+    currentTime = time.time() # to prevent FileAlreadyExistsException
+    sc.parallelize([p.printPoint() for p in newCentroids], 1).saveAsTextFile(output_path)
+    print("Tempo fine algoritmo: " + str(currentTime))
+    print("Numero iterazioni: " + str(count) )
+    print("Durata algoritmo: " + str(currentTime - startTime))
     spark.stop()
