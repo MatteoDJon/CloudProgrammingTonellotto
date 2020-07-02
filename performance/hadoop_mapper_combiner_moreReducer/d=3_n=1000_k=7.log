@@ -1,0 +1,7 @@
+Uso parametri d = 3, k = 7
+Nome file input = input_data_d=3_n=1000.txt, file output = centroids_d=3_n=1000_k=7.txt
+Tempo di inizio: 1593679155978
+Tempo inizio dell'algoritmo: 1593679277517
+Tempo di fine: 1593679917433
+Durata dell'algoritmo: 761455
+Numero di iterazioni: 30
