@@ -126,8 +126,14 @@ if __name__ == "__main__":
         count += 1
 
     currentTime = time.time() # to prevent FileAlreadyExistsException
-    sc.parallelize([p.printPoint() for p in newCentroids], 1).saveAsTextFile(output_path)
     print("Tempo fine algoritmo: " + str(currentTime))
     print("Numero iterazioni: " + str(count) )
     print("Durata algoritmo: " + str(currentTime - startTime))
+    filesystem = sc._jvm.org.apache.hadoop.fs.FileSystem
+    fs = filesystem.get(sc._jsc.hadoopConfiguration())
+    path = sc._jvm.org.apache.hadoop.fs.Path
+    output_path_for_hadoop = sc._jvm.org.apache.hadoop.fs.Path(output_path)
+    if (fs.exists(output_path_for_hadoop)):
+        fs.delete(output_path_for_hadoop, True);
+    sc.parallelize([p.printPoint() for p in newCentroids], 1).saveAsTextFile(output_path)
     spark.stop()
