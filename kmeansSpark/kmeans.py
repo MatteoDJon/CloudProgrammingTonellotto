@@ -84,7 +84,7 @@ if __name__ == "__main__":
     oldCentroids = []
     newCentroids = kPoints
     count = 0
-    maxIterations = 40
+    maxIterations = 100
 
     parallelizedPoints = lines.map(lambda line: Point(line,d)).cache()
 
