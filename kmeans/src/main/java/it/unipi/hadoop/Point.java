@@ -37,9 +37,9 @@ class Point implements Writable {
     }
 
     public static Point parseString(String line) throws ParseException {
-        StringTokenizer itr = new StringTokenizer(line);
+        String[] itr = line.split(" ");
 
-        int d = itr.countTokens();
+        int d = itr.length;
 
         if (d <= 0)
             throw new ParseException("Invalid string for Point", 0);
@@ -47,8 +47,8 @@ class Point implements Writable {
         double array[] = new double[d];
 
         int i = 0;
-        while (itr.hasMoreTokens()) {
-            array[i] = Double.parseDouble(itr.nextToken());
+        for (String s : itr) {
+            array[i] = Double.parseDouble(s);
             i++;
         }
 

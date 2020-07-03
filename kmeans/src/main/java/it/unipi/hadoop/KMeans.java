@@ -56,11 +56,16 @@ class KMeans {
                 }
             } catch (IOException | ParseException e) {
                 // TODO handle exception
+		System.err.println("Problem parsing points, or file does not exist");
+		System.exit(1);
             }
 
             // check if centroids are not k
             if (centroids.size() != this.k) {
                 System.err.println("Wrong centroids number");
+		for (Point p: centroids)
+			System.err.println(p.toString());
+		System.err.println("These were the points read");
                 System.exit(1);
             }
         }

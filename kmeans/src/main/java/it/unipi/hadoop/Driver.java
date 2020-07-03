@@ -96,11 +96,13 @@ public class Driver {
             // write each centroid in a line of the cache file
             for (Point centroid : centroids) {
                 writer.write(centroid.toString());
-                writer.newLine();
+		writer.newLine();
             }
 
         } catch (IOException e) {
             // TODO handle exception
+		System.err.println("Problem while updating the cache");
+		System.err.println(e.getMessage());
         }
     }
     
@@ -206,8 +208,12 @@ public class Driver {
         Path KMeansSamplingDir = new Path(KMeansDirName + "UniformSampling");
         FileSystem fs = FileSystem.get(conf);
 
+	// cleanup everything there is as output
+	if (fs.exists(outputFile)){
+	    fs.delete(outputFile, true);
+	}
         // select initial centroids and write them to file
-        List<Point> centroids = getRandomCentroids(conf, k, fs, inputFile, KMeansSamplingDir);
+	List<Point> centroids = getRandomCentroids(conf, k, fs, inputFile, KMeansSamplingDir);
         updateCache(centroids, fs, outputFile);
         boolean success = true;
         int iteration = 1;
