@@ -5,7 +5,6 @@ import java.io.DataOutput;
 import java.io.IOException;
 import java.text.ParseException;
 import java.util.Arrays;
-import java.util.StringTokenizer;
 
 import org.apache.hadoop.io.ArrayPrimitiveWritable;
 import org.apache.hadoop.io.Writable;
@@ -14,9 +13,7 @@ class Point implements Writable {
 
     private double[] point;
 
-    private Point() {
-
-    }
+    private Point() {}
 
     public Point(int d) {
         if (d <= 0)

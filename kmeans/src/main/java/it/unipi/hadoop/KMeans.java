@@ -139,10 +139,10 @@ class KMeans {
         }
     }
 
-    static Job createKMeansJob(Configuration conf, Path inputFile, Path outputDir, Path outputFile, int dimension, int nCentroids) throws IOException {
+    static Job createKMeansJob(Configuration conf, Path inputFile, Path outputDir, Path outputFile, int d, int k) throws IOException {
 
-        conf.setInt("kmeans.d", dimension);
-        conf.setInt("kmeans.k", nCentroids);
+        conf.setInt("kmeans.d", d);
+        conf.setInt("kmeans.k", k);
         conf.set("kmeans.output", outputFile.toString());
 
         Job job = Job.getInstance(conf, "kmeans");
@@ -155,11 +155,14 @@ class KMeans {
         job.setMapperClass(KMeansMapper.class);
         job.setReducerClass(KMeansReducer.class);
         job.setCombinerClass(KMeansReducer.class);
+        
         job.setMapOutputKeyClass(IntWritable.class);
         job.setMapOutputValueClass(WritableWrapper.class);
         job.setOutputKeyClass(IntWritable.class);
         job.setOutputValueClass(WritableWrapper.class);
-        job.setNumReduceTasks(nCentroids);
+
+        job.setNumReduceTasks(k);
+
         return job;
     }
 
