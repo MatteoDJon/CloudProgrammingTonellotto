@@ -1,12 +1,10 @@
 package it.unipi.hadoop.sampling;
 
-import org.apache.hadoop.io.Text;
-
 class PriorityLinePair {
     double priority;
-    Text line;
+    String line;
 
-    public PriorityLinePair(double priority, Text line) {
+    PriorityLinePair(double priority, String line) {
         this.priority = priority;
         this.line = line;
     }

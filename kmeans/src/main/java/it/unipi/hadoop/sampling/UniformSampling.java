@@ -24,6 +24,7 @@ public class UniformSampling {
         private int size = 0;
 
         private static DoubleWritable wPriority = new DoubleWritable();
+        private static Text wLine = new Text();
 
         public void setup(Context context) throws IOException, InterruptedException {
             k = context.getConfiguration().getInt("uniformsampling.k", 13);
@@ -36,14 +37,14 @@ public class UniformSampling {
 
             // insert the first k points
             if (size < k) {
-                queue.add(new PriorityLinePair(priority, value));
+                queue.add(new PriorityLinePair(priority, value.toString()));
                 size++;
             } else {
                 // insert only if priority is in the k smallest priorities
                 double maxPriority = queue.peek().priority;
                 if (priority < maxPriority) {
                     queue.poll();
-                    queue.offer(new PriorityLinePair(priority, value));
+                    queue.offer(new PriorityLinePair(priority, value.toString()));
                 }
             }
         }
@@ -53,7 +54,9 @@ public class UniformSampling {
             // emit <priority, line> for each of the k elements in the queue
             for (PriorityLinePair pair : queue) {
                 wPriority.set(pair.priority);
-                context.write(wPriority, pair.line);
+                wLine.set(pair.line);
+                
+                context.write(wPriority, wLine);
             }
         }
 

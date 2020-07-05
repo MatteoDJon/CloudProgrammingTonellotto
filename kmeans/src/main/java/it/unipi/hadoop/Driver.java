@@ -224,7 +224,7 @@ public class Driver {
         Path inputFile = new Path(inputName);
         Path outputFile = new Path(outputName);
         Path KMeansDir = new Path(KMeansDirName);
-        Path KMeansSamplingDir = new Path(KMeansDirName + "UniformSampling");
+        Path KMeansSamplingDir = new Path("UniformSampling");
         FileSystem fs = FileSystem.get(conf);
 
         // cleanup everything there is as output
