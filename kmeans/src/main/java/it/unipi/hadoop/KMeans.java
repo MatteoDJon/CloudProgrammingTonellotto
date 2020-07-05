@@ -19,15 +19,16 @@ import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 
-class KMeans {
+public class KMeans {
     
     public static class KMeansMapper extends Mapper<Object, Text, IntWritable, WritableWrapper> {
 
         private int d;
         private int k;
         private List<Point> centroids;
-        private IntWritable outputKey = new IntWritable(); // reuse
-        private WritableWrapper outputValue = new WritableWrapper(); // reuse
+
+        private static IntWritable outputKey = new IntWritable(); // reuse
+        private static WritableWrapper outputValue = new WritableWrapper(); // reuse
 
         public void setup(Context context) throws IOException, InterruptedException {
             this.d = context.getConfiguration().getInt("kmeans.d", 7);
@@ -56,8 +57,8 @@ class KMeans {
                 }
             } catch (IOException | ParseException e) {
                 // TODO handle exception
-		System.err.println("Problem parsing points, or file does not exist");
-		System.exit(1);
+                System.err.println("Problem parsing points, or file does not exist");
+                System.exit(1);
             }
 
             // check if centroids are not k
@@ -81,13 +82,13 @@ class KMeans {
                     return;
 
                 int nearestClusterId = -1;
-                double minDistance = -1d;
+                double minDistance = Double.POSITIVE_INFINITY;
 
                 // find the nearest centroid
                 int id = 0;
                 for (Point centroid : centroids) {
                     double distance = point.computeSquaredDistance(centroid);
-                    if (minDistance == -1 || distance < minDistance) {
+                    if (distance < minDistance) {
                         minDistance = distance;
                         nearestClusterId = id;
                     }

@@ -11,7 +11,7 @@ import org.apache.hadoop.io.Writable;
 
 class Point implements Writable {
 
-    private double[] point;
+    private double[] coordinates;
 
     private Point() {}
 
@@ -19,18 +19,18 @@ class Point implements Writable {
         if (d <= 0)
             throw new IllegalArgumentException("Invalid dimension for Point");
 
-        point = new double[d];
+        coordinates = new double[d];
     }
 
     public Point(double[] a) {
         if (a == null || a.length <= 0)
             throw new IllegalArgumentException("Invalid array for Point");
 
-        point = a;
+        coordinates = a;
     }
 
     public Point(final Point p) {
-        point = Arrays.copyOf(p.point, p.point.length);
+        coordinates = Arrays.copyOf(p.coordinates, p.coordinates.length);
     }
 
     public static Point parseString(String line) throws ParseException {
@@ -53,25 +53,25 @@ class Point implements Writable {
     }
 
     public int getDimension() {
-        return point.length;
+        return coordinates.length;
     }
 
     public void sum(Point that) {
-        for (int i = 0; i < point.length; i++)
-            this.point[i] += that.point[i];
+        for (int i = 0; i < coordinates.length; i++)
+            this.coordinates[i] += that.coordinates[i];
     }
 
     public void divide(int scalar) {
-        for (int i = 0; i < point.length; i++)
-            this.point[i] = this.point[i] / scalar;
+        for (int i = 0; i < coordinates.length; i++)
+            this.coordinates[i] = this.coordinates[i] / scalar;
     }
 
     public double computeSquaredDistance(Point that) {
 
         double sum = 0;
 
-        for (int i = 0; i < getDimension(); i++)
-            sum += Math.pow(this.point[i] - that.point[i], 2);
+        for (int i = 0; i < coordinates.length; i++)
+            sum += Math.pow(this.coordinates[i] - that.coordinates[i], 2);
 
         return sum;
     }
@@ -79,8 +79,8 @@ class Point implements Writable {
     public double computeSquaredNorm() {
         double squaredNorm = 0;
 
-        for (int i = 0; i < this.point.length; i++)
-            squaredNorm += this.point[i] * this.point[i];
+        for (int i = 0; i < this.coordinates.length; i++)
+            squaredNorm += this.coordinates[i] * this.coordinates[i];
 
         return squaredNorm;
     }
@@ -88,11 +88,11 @@ class Point implements Writable {
     @Override
     public String toString() {
         String str = "";
-        for (int i = 0; i < point.length - 1; i++) {
-            str += Double.toString(this.point[i]);
+        for (int i = 0; i < coordinates.length - 1; i++) {
+            str += Double.toString(this.coordinates[i]);
             str += " ";
         }
-        str += Double.toString(this.point[this.point.length - 1]);
+        str += Double.toString(this.coordinates[this.coordinates.length - 1]);
         return str;
     }
 
@@ -109,8 +109,8 @@ class Point implements Writable {
             return false;
         Point that = (Point) o;
         // field comparison
-        for (int i = 0; i < point.length; i++)
-            if (this.point[i] != that.point[i])
+        for (int i = 0; i < coordinates.length; i++)
+            if (this.coordinates[i] != that.coordinates[i])
                 return false;
 
         return true;
@@ -118,14 +118,14 @@ class Point implements Writable {
 
     @Override
     public void write(DataOutput out) throws IOException {
-        new ArrayPrimitiveWritable(point).write(out);
+        new ArrayPrimitiveWritable(coordinates).write(out);
     }
 
     @Override
     public void readFields(DataInput in) throws IOException {
         ArrayPrimitiveWritable apw = new ArrayPrimitiveWritable();
         apw.readFields(in);
-        point = (double[]) apw.get();
+        coordinates = (double[]) apw.get();
     }
 
     public static Point read(DataInput in) throws IOException {
