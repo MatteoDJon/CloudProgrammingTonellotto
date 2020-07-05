@@ -2,11 +2,13 @@ package it.unipi.hadoop;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.text.ParseException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -30,21 +32,26 @@ public class Driver {
 
     private static String outputName = "centroids.txt";
     private static String inputName = "data.txt";
-    private static String KMeansDirName = "KMeansTemporary";
+    private static final String KMeansDirName = "KMeansTemporary";
+    private static final String SAMPLED_CENTROIDS_DIR = "UniformSampling";
 
-    private static final Pattern patternOutputFiles = Pattern.compile("part-(r-)?[\\d]{5}");
+    private static final Pattern outputFilesPattern = Pattern.compile("part-(r-)?[\\d]{5}");
 
-    static List<Path> getOutputFiles(FileSystem fs, Path outputDir) throws Exception {
+    private static List<Path> getOutputFiles(FileSystem fs, Path outputDir)
+            throws FileNotFoundException, IOException {
+
         List<Path> listPaths = new ArrayList<>();
-        Matcher matcher;
+
         RemoteIterator<LocatedFileStatus> rit = fs.listFiles(outputDir, false);
+
         while (rit.hasNext()) {
             Path outputFile = rit.next().getPath();
-            matcher = patternOutputFiles.matcher(outputFile.toString());
-            if (matcher.find()) {
+            Matcher matcher = outputFilesPattern.matcher(outputFile.toString());
+
+            if (matcher.find())
                 listPaths.add(outputFile);
-            }
         }
+
         return listPaths;
     }
 
@@ -91,7 +98,7 @@ public class Driver {
     }
     */
 
-    private static void executeUniformSampling(Configuration conf, int k, Path inputFile, Path outputDir)
+    private static boolean executeUniformSampling(Configuration conf, int k, Path inputFile, Path outputDir)
             throws Exception {
 
         conf.setInt("uniformsampling.k", k);
@@ -102,7 +109,45 @@ public class Driver {
             fs.delete(outputDir, true);
   
         Job job = UniformSampling.createJob(conf, inputFile, outputDir);
-        job.waitForCompletion(true);
+
+        return job.waitForCompletion(true);
+    }
+
+    private static List<Point> readSampledCentroids(int k, FileSystem fs) {
+
+        List<Point> centroids = new ArrayList<>(k);
+
+        Path outputFile = new Path(SAMPLED_CENTROIDS_DIR, "part-r-00000");
+
+        try (FSDataInputStream stream = fs.open(outputFile);
+                BufferedReader reader = new BufferedReader(new InputStreamReader(stream))) {
+    
+            String line;
+            while ((line = reader.readLine()) != null) {
+                Point p = Point.parseString(line);
+                centroids.add(p);
+            }
+
+        } catch (IOException e) {
+            System.err.println("Could not read sampled centroids");
+            System.err.println(e.getMessage());
+            return null;
+        } catch (ParseException e) {
+            System.err.println("Malformed point string");
+            return null;
+        }
+        
+        if (centroids.size() != k) {
+            System.err.println("Number of read centroids is not k");
+            return null;
+        }
+
+        if (new HashSet<Point>(centroids).size() != k) {
+            System.err.println("Found some duplicate centroids");
+            return null;
+        }
+
+        return centroids;
     }
 
 
@@ -232,8 +277,9 @@ public class Driver {
             fs.delete(outputFile, true);
         
         executeUniformSampling(conf, k, inputFile, KMeansSamplingDir);
+        List<Point> initialCentroids = readSampledCentroids(k, fs);
 
-        long samplingEnd = System.currentTimeMillis();
+        long samplingEnd = System.currentTimeMillis();        
 
         System.out.println("Uniform Sampling: " + (samplingEnd - startTime)/1000 + " s");
 
