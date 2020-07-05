@@ -28,7 +28,7 @@ import it.unipi.hadoop.sampling.UniformSampling;
 
 public class Driver {
 
-    private static final double convergeDist = 1e-9;
+    private static final double CONVERGENCE_THRESHOLD = 1e-2;
     private static final int MAX_ITERATIONS = 100;
 
     private static String outputName = "centroids.txt";
@@ -75,9 +75,9 @@ public class Driver {
 
         List<Point> centroids = new ArrayList<>(k);
 
-        Path outputFile = new Path(SAMPLED_CENTROIDS_DIR, "part-r-00000");
+        Path centroidsFile = new Path(SAMPLED_CENTROIDS_DIR, "part-r-00000");
 
-        try (FSDataInputStream stream = fs.open(outputFile);
+        try (FSDataInputStream stream = fs.open(centroidsFile);
                 BufferedReader reader = new BufferedReader(new InputStreamReader(stream))) {
     
             String line;
@@ -249,10 +249,10 @@ public class Driver {
         if (fs.exists(kMeansDir))
             fs.delete(kMeansDir, true);
 
-        double tempDistance = convergeDist + 0.1;
+        double tempDistance = Double.POSITIVE_INFINITY;
         long kMeansStart = System.currentTimeMillis();
         
-        while (success && tempDistance > convergeDist && iteration <= MAX_ITERATIONS) {
+        while (success && tempDistance > CONVERGENCE_THRESHOLD && iteration <= MAX_ITERATIONS) {
             iteration++;
 
             // new job to compute new centroids
@@ -280,7 +280,7 @@ public class Driver {
         
         long endTime = System.currentTimeMillis();
 
-        boolean converged = tempDistance <= convergeDist;
+        boolean converged = tempDistance <= CONVERGENCE_THRESHOLD;
 
         System.out.println("Total execution time:    " + secondsBetween(startTime, endTime) + " s");
         System.out.println("  uniform sampling:      " + secondsBetween(startTime, samplingEnd) + " s");
