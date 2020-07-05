@@ -6,6 +6,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
+import java.text.DecimalFormat;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -28,7 +29,7 @@ import it.unipi.hadoop.sampling.UniformSampling;
 public class Driver {
 
     private static final double convergeDist = 1e-9;
-    private static final int maxIterations = 100;
+    private static final int MAX_ITERATIONS = 100;
 
     private static String outputName = "centroids.txt";
     private static String inputName = "data.txt";
@@ -55,50 +56,7 @@ public class Driver {
         return listPaths;
     }
 
-    /*
-    static List<Point> getRandomCentroids(Configuration conf, int k, FileSystem fs, Path inputFile, Path outputDir)
-            throws Exception {
-
-        List<Point> centroids = new ArrayList<>(k);
-        int i = 0;
-        // simple control, just in case
-        if (fs.exists(outputDir)) {
-            fs.delete(outputDir, true);
-        }
-        while (i < k) {
-            Job job = UniformSampling.createUniformSamplingJob(conf, inputFile, outputDir);
-            job.waitForCompletion(true);
-            // prelevare i punti e aggiungerli alla lista
-            List<Path> outputFiles = getOutputFiles(fs, outputDir);
-
-            for (Path outputFile : outputFiles) {
-                try (FSDataInputStream stream = fs.open(outputFile);
-                        BufferedReader reader = new BufferedReader(new InputStreamReader(stream))) {
-                    Point p = Point.parseString(reader.readLine());
-                    boolean unique = true;
-                    for (Point c : centroids) {
-                        if (c.equals(p)) {
-                            unique = false;
-                            break;
-                        }
-                    }
-                    if (unique) {
-                        centroids.add(p);
-                        ++i;
-                    }
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            }
-            if (fs.exists(outputDir)) {
-                fs.delete(outputDir, true);
-            }
-        }
-        return centroids;
-    }
-    */
-
-    private static boolean executeUniformSampling(Configuration conf, int k, Path inputFile, Path outputDir)
+    private static boolean executeUniformSamplingJob(Configuration conf, int k, Path inputFile, Path outputDir)
             throws Exception {
 
         conf.setInt("uniformsampling.k", k);
@@ -150,8 +108,7 @@ public class Driver {
         return centroids;
     }
 
-
-    static void updateCache(List<Point> centroids, FileSystem fs, Path cache) {
+    private static void updateCache(List<Point> centroids, FileSystem fs, Path cache) throws IOException {
 
         try (FSDataOutputStream stream = fs.create(cache, true);
                 BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(stream))) {
@@ -163,9 +120,8 @@ public class Driver {
             }
 
         } catch (IOException e) {
-            // TODO handle exception
-            System.err.println("Problem while updating the cache");
-            System.err.println(e.getMessage());
+            System.out.println("Could not update centroids cache '" + cache.toString() + "'");
+            throw e;
         }
     }
 
@@ -263,53 +219,50 @@ public class Driver {
         // System.out.println("Uso parametri d = " + Integer.toString(d) + ", k = " + Integer.toString(k));
         // System.out.println("Nome file input = " + inputName + ", file output = " + outputName);
 
-        long startTime = System.currentTimeMillis();
-
         Configuration conf = new Configuration();
         Path inputFile = new Path(inputName);
         Path outputFile = new Path(outputName);
-        Path KMeansDir = new Path(KMeansDirName);
-        Path KMeansSamplingDir = new Path("UniformSampling");
+        Path kMeansDir = new Path(KMeansDirName);
+        Path samplingDir = new Path(SAMPLED_CENTROIDS_DIR);
         FileSystem fs = FileSystem.get(conf);
 
         // cleanup everything there is as output
         if (fs.exists(outputFile))
             fs.delete(outputFile, true);
+
+        long startTime = System.currentTimeMillis();
         
-        executeUniformSampling(conf, k, inputFile, KMeansSamplingDir);
+        // select randomly k initial centroids
+        boolean success = executeUniformSamplingJob(conf, k, inputFile, samplingDir);
         List<Point> initialCentroids = readSampledCentroids(k, fs);
 
-        long samplingEnd = System.currentTimeMillis();        
+        long samplingEnd = System.currentTimeMillis();
 
-        System.out.println("Uniform Sampling: " + (samplingEnd - startTime)/1000 + " s");
+        // write initial centroids file in hdfs
+        updateCache(initialCentroids, fs, outputFile);
 
-        /*
-        // select initial centroids and write them to file
-        List<Point> centroids = getRandomCentroids(conf, k, fs, inputFile, KMeansSamplingDir);
-        updateCache(centroids, fs, outputFile);
-        boolean success = true;
-        int iteration = 1;
-        List<Point> currentCentroids = centroids;
+        int iteration = 0;
+        List<Point> currentCentroids = initialCentroids;
         List<Point> newCentroids = new ArrayList<>(k);
 
         // delete the output directory if exists
-        if (fs.exists(KMeansDir))
-            fs.delete(KMeansDir, true);
+        if (fs.exists(kMeansDir))
+            fs.delete(kMeansDir, true);
 
         double tempDistance = convergeDist + 0.1;
-        long timeAlgStart = System.currentTimeMillis();
-        */
-
-        /*
-        while (success && tempDistance > convergeDist && iteration <= maxIterations) {
+        long kMeansStart = System.currentTimeMillis();
+        
+        while (success && tempDistance > convergeDist && iteration <= MAX_ITERATIONS) {
+            iteration++;
 
             // new job to compute new centroids
-            Job kmeansJob = KMeans.createKMeansJob(conf, inputFile, KMeansDir, outputFile, d, k);
+            Job kmeansJob = KMeans.createKMeansJob(conf, inputFile, kMeansDir, outputFile, d, k);
             success = kmeansJob.waitForCompletion(true);
-            // add new centroids to list
-            readCentroidsFromOutput(newCentroids, fs, KMeansDir);
 
-            // write new centroids to file read from mapper
+            // add new centroids to list
+            readCentroidsFromOutput(newCentroids, fs, kMeansDir);
+
+            // write new centroids to file so that mappers can read them
             updateCache(newCentroids, fs, outputFile);
 
             // sum of all the relative errors between old centroids and new centroids
@@ -319,26 +272,34 @@ public class Driver {
             List<Point> tempList = currentCentroids;
             currentCentroids = newCentroids;
             newCentroids = tempList;
-
-            iteration++;
-            // System.out.println("tempDistance = " + Double.toString(tempDistance)); //
-            // DEBUG
+            
             // delete the output directory if exists
-            if (fs.exists(KMeansDir))
-                fs.delete(KMeansDir, true);
+            if (fs.exists(kMeansDir))
+                fs.delete(kMeansDir, true);
         }
-        */
-
-        /*
+        
         long endTime = System.currentTimeMillis();
 
-        System.out.println("Tempo di inizio: " + startTime);
-        System.out.println("Tempo inizio dell'algoritmo: " + timeAlgStart);
-        System.out.println("Tempo di fine: " + endTime);
-        System.out.println("Durata dell'algoritmo: " + (endTime - startTime));
+        boolean converged = tempDistance <= convergeDist;
 
-        System.out.println("Numero di iterazioni: " + iteration);
+        System.out.println("Total execution time:    " + secondsBetween(startTime, endTime) + " s");
+        System.out.println("  uniform sampling:      " + secondsBetween(startTime, samplingEnd) + " s");
+        System.out.println("  k-means algorithm:     " + secondsBetween(kMeansStart, endTime) + " s");
+
+        System.out.println("Number of iterations:    " + iteration);
+        System.out.println("Centroids last movement: " + tempDistance);
+        System.out.println("Success && converged:    " + ((success && converged) ? "yes" : "no"));
+
         System.exit(success ? 0 : 1);
-        */
+    }
+
+    private static String secondsBetween(long from, long to) {
+        DecimalFormat df = new DecimalFormat();
+        df.setMaximumFractionDigits(2);
+        df.setMinimumFractionDigits(2);
+
+        float result = (float) (to - from) / 1000;
+
+        return df.format(result);
     }
 }
