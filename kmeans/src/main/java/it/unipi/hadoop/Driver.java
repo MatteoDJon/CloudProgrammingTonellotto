@@ -153,15 +153,16 @@ public class Driver {
 
                     // Don't know if I can trust the position of the files for the new centroids
                     // Important: I assume that a key starts from 0 (really important)
-                    while (list.size() <= position) {
+                    while (list.size() <= position)
                         list.add(null);
-                    }
+                    
                     list.set(position, centroid);
                 }
 
             } catch (IOException | ParseException e) {
-                // TODO handle exception
+                System.err.println("Could not read centroids of last iteration");
                 System.err.println("Exception: " + e.getMessage());
+                System.exit(1);
             }
         }
 

@@ -4,9 +4,9 @@ KMEANS=/home/hadoop/fede/CloudProgrammingTonellotto/kmeans
 mvn clean -f "${KMEANS}/pom.xml"
 mvn package -f "${KMEANS}/pom.xml"
 
-n=1000
-d=3
-k=7
+n=100000
+d=7
+k=13
 
 inputfile="data_n=${n}_d=${d}_k=${k}.txt"
 inputpath="data-stdev0.2/${inputfile}"

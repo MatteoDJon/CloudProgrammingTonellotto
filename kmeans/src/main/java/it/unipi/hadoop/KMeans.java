@@ -56,8 +56,7 @@ public class KMeans {
                     centroids.add(newPoint);
                 }
             } catch (IOException | ParseException e) {
-                // TODO handle exception
-                System.err.println("Problem parsing points, or file does not exist");
+                System.err.println("Could not read centroids correctly");
                 System.exit(1);
             }
 
@@ -102,7 +101,7 @@ public class KMeans {
 
             } catch (ParseException e) {
                 // ignore malformed points
-                // TODO print something
+                System.err.println("Could not parse '" + value.toString() + "'");
             }
         }
     }
