@@ -3,9 +3,11 @@ package it.unipi.hadoop;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.FileNotFoundException;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
+import java.io.PrintWriter;
 import java.text.DecimalFormat;
 import java.text.ParseException;
 import java.util.ArrayList;
@@ -198,12 +200,16 @@ public class Driver {
         // otherArgs[1] = k;
         // otherArgs[2] = inputName;
         // otherArgs[3] = outputName;
+        // otherArgs[4] = n;
         // KMeansSamplingDirName può essere construito concatenando KMeansDir con "Sampling"
          
+        String n = "____";
         int d = 3; // default
         int k = 7; // default
         switch (otherArgs.length) {
             default:
+            case 5:
+                n = otherArgs[4];
             case 4:
                 outputName = otherArgs[3];
             case 3:
@@ -282,24 +288,67 @@ public class Driver {
 
         boolean converged = tempDistance <= CONVERGENCE_THRESHOLD;
 
-        System.out.println("Total execution time:    " + secondsBetween(startTime, endTime) + " s");
-        System.out.println("  uniform sampling:      " + secondsBetween(startTime, samplingEnd) + " s");
-        System.out.println("  k-means algorithm:     " + secondsBetween(kMeansStart, endTime) + " s");
+        // System.out.println("Total execution time:    " + secondsBetween(startTime, endTime) + " s");
+        // System.out.println("  uniform sampling:      " + secondsBetween(startTime, samplingEnd) + " s");
+        // System.out.println("  k-means algorithm:     " + secondsBetween(kMeansStart, endTime) + " s");
 
-        System.out.println("Number of iterations:    " + iteration);
-        System.out.println("Centroids last movement: " + tempDistance);
-        System.out.println("Success && converged:    " + ((success && converged) ? "yes" : "no"));
+        // System.out.println("Number of iterations:    " + iteration);
+        // System.out.println("Centroids last movement: " + tempDistance);
+        // System.out.println("Success && converged:    " + ((success && converged) ? "yes" : "no"));
+
+        String metricsFile = String.format("hadoop_n=%s_d=%d_k=%d.csv", n, d, k);
+
+        PerformanceMetrics metrics = new PerformanceMetrics();
+        metrics.totalExecutionTime = secondsBetween(startTime, endTime);
+        metrics.samplingExecutionTime = secondsBetween(startTime, samplingEnd);
+        metrics.kMeansExecutionTime = secondsBetween(kMeansStart, endTime);
+        metrics.iterations = iteration;
+        metrics.centroidsLastMovement = tempDistance;
+        metrics.successful = success && converged;
+        metrics.saveToFile(metricsFile);
 
         System.exit(success ? 0 : 1);
     }
 
-    private static String secondsBetween(long from, long to) {
-        DecimalFormat df = new DecimalFormat();
-        df.setMaximumFractionDigits(2);
-        df.setMinimumFractionDigits(2);
+    private static double secondsBetween(long from, long to) {
+        return (double) (to - from) / 1000;
+    }
 
-        float result = (float) (to - from) / 1000;
+    private static class PerformanceMetrics {
+        double totalExecutionTime;
+        double samplingExecutionTime;
+        double kMeansExecutionTime;
+        int iterations;
+        double centroidsLastMovement;
+        boolean successful;
 
-        return df.format(result);
+        void saveToFile(String file) {
+            // formatter for float and double
+            DecimalFormat df = new DecimalFormat();
+            df.setMaximumFractionDigits(2);
+            df.setMinimumFractionDigits(2);
+            df.setGroupingUsed(false);
+
+            // write performance metrics in append
+            try (FileWriter fw = new FileWriter(file, true);
+                    BufferedWriter bw = new BufferedWriter(fw);
+                    PrintWriter fout = new PrintWriter(bw)) {
+
+                // csv
+                String line = String.format("%s,%s,%s,%d,%.9f,%b",
+                        df.format(totalExecutionTime),
+                        df.format(samplingExecutionTime),
+                        df.format(kMeansExecutionTime),
+                        iterations,
+                        centroidsLastMovement,
+                        successful);
+                fout.println(line);
+
+            } catch (IOException e) {
+                System.err.println("Could not write performance to file");
+            }
+        }
     }
 }
+
+
