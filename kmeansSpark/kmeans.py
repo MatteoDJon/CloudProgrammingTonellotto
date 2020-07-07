@@ -154,14 +154,15 @@ if __name__ == "__main__":
         "kmeans_exec_time": end_time - sampling_end,
         "iterations": iteration,
         "centroids_last_movement": compareCentroids(oldCentroids, newCentroids),
-        "successful": compareCentroids(oldCentroids, newCentroids) <= CONVERGENCE_THRESHOLD
+        "successful": compareCentroids(oldCentroids, newCentroids) <= CONVERGENCE_THRESHOLD,
     }
 
-    print("{%.2f},{%.2f},{%.2f},{%d},{%.9f}\n".format(
+    print("%.2f,%.2f,%.2f,%d,%.9f,%s\n" % (
         metrics["total_exec_time"],
         metrics["sampling_exec_time"],
         metrics["kmeans_exec_time"],
         metrics["iterations"],
-        metrics["centroids_last_movement"] ))
+        metrics["centroids_last_movement"],
+        str(metrics["successful"]).lower(), ))
 
     spark.stop()
