@@ -70,25 +70,31 @@ if __name__ == "__main__":
     data_path = sys.argv[3]
     output_path = sys.argv[4]
 
+    n = sys.argv[5]
+
     print("Parametri di ingresso k=" + str(K) + " d=" + str(d) + " path=" + data_path)
 
     lines = sc.textFile(data_path)
     
     currentTime = time.time()
     print("Tempo inizio algoritmo: " + str(currentTime))
-    startTime = currentTime
+    start_time = currentTime
 
     kPoints = [Point(line,d) for line in lines.takeSample(withReplacement=True, num=K)]
 
-    minError = 1e-9
+    sampling_end = time.time()
+
+    print(kPoints)
+
+    CONVERGENCE_THRESHOLD = 1e-5
     oldCentroids = []
     newCentroids = kPoints
-    count = 0
-    maxIterations = 100
+    iteration = 0
+    MAX_ITERATIONS = 100
 
     parallelizedPoints = lines.map(lambda line: Point(line,d)).cache()
 
-    while(compareCentroids(oldCentroids, newCentroids) > minError and count < maxIterations):
+    while(compareCentroids(oldCentroids, newCentroids) > CONVERGENCE_THRESHOLD and iteration < MAX_ITERATIONS):
         oldCentroids = newCentroids
         closest = parallelizedPoints.map(
             lambda p: (closestPoint(p, newCentroids), (p, 1)))
@@ -123,12 +129,9 @@ if __name__ == "__main__":
         newCentroids = [i for i in range(K)]
         for row in newPoint.collect():
             newCentroids[row[0]] = row[1]
-        count += 1
+        iteration += 1
 
-    currentTime = time.time() # to prevent FileAlreadyExistsException
-    print("Tempo fine algoritmo: " + str(currentTime))
-    print("Numero iterazioni: " + str(count) )
-    print("Durata algoritmo: " + str(currentTime - startTime))
+    """
     filesystem = sc._jvm.org.apache.hadoop.fs.FileSystem
     fs = filesystem.get(sc._jsc.hadoopConfiguration())
     path = sc._jvm.org.apache.hadoop.fs.Path
@@ -136,4 +139,29 @@ if __name__ == "__main__":
     if (fs.exists(output_path_for_hadoop)):
         fs.delete(output_path_for_hadoop, True);
     sc.parallelize([p.printPoint() for p in newCentroids], 1).saveAsTextFile(output_path)
+    """
+
+    sc.parallelize([p.printPoint() for p in newCentroids], 1).saveAsTextFile(output_path)
+
+    end_time = time.time() # to prevent FileAlreadyExistsException
+    print("Tempo fine algoritmo: " + str(end_time))
+    print("Numero iterazioni: " + str(iteration) )
+    print("Durata algoritmo: " + str(end_time - start_time))
+
+    metrics = {
+        "total_exec_time": end_time - start_time,
+        "sampling_exec_time": sampling_end - start_time,
+        "kmeans_exec_time": end_time - sampling_end,
+        "iterations": iteration,
+        "centroids_last_movement": compareCentroids(oldCentroids, newCentroids),
+        "successful": compareCentroids(oldCentroids, newCentroids) <= CONVERGENCE_THRESHOLD
+    }
+
+    print("{%.2f},{%.2f},{%.2f},{%d},{%.9f}\n".format(
+        metrics["total_exec_time"],
+        metrics["sampling_exec_time"],
+        metrics["kmeans_exec_time"],
+        metrics["iterations"],
+        metrics["centroids_last_movement"] ))
+
     spark.stop()
