@@ -12,4 +12,4 @@ outputdir="spark_centroids_n=${n}_d=${d}_k=${k}.d"
 outputpath="spark/result-stdev0.2/${outputfile}"
 
 hadoop fs -rm -r ${outputdir}
-python3 ${KMEANSSPARK}/kmeans.py 3 7 ${d} ${k} ${inputpath} ${outputpath} ${n}
+python3 ${KMEANSSPARK}/kmeans.py ${d} ${k} ${inputpath} ${outputpath} ${n}
