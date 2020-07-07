@@ -8,6 +8,8 @@ if [ "${namenode}" = "hadoop-namenode" ]; then
     start-yarn.sh
 
     cd /opt/yarn/local/usercache/hadoop/filecache && sudo rm -rf *
+
+    hdfs dfsadmin -safemode leave
 else
 
     cd /tmp/hadoop-hadoop/nm-local-dir/usercache/hadoop/filecache && sudo rm -rf *
