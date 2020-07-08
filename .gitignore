@@ -187,3 +187,6 @@ dmypy.json
 
 # Cython debug symbols
 cython_debug/
+
+# cartella di prova
+kmeans_prova/
