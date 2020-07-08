@@ -16,7 +16,7 @@ def parseVector(line):
     return np.array([float(x) for x in line.split(' ')])
 
 
-def closestPoint(p, centers):
+def find_closest_point(p, centers):
     bestIndex = 0
     closest = float("+inf")
     for i in range(0, len(centers)):
@@ -27,7 +27,7 @@ def closestPoint(p, centers):
     return bestIndex
 
 
-def compareCentroids(old, new):
+def compare_centroids(old, new):
     if(len(old) != len(new)):
         return float('inf')
     tempError = 0.0
@@ -45,7 +45,7 @@ def compareCentroids(old, new):
     return tempError
 
 
-def sumTwoPoints(point1, point2):
+def sum_two_points(point1, point2):
     return point1.sumPoint(point2)
 
 
@@ -113,27 +113,26 @@ if __name__ == "__main__":
     lines = sc.textFile(data_path)
     
     currentTime = time.time()
-    print("Tempo inizio algoritmo: " + str(currentTime))
     start_time = currentTime
 
-    kPoints = [Point(line,d) for line in lines.takeSample(withReplacement=True, num=K)]
+    initial_centroids = [Point(line,d) for line in lines.takeSample(withReplacement=True, num=K)]
 
     sampling_end = time.time()
 
-    print(kPoints)
+    print(initial_centroids)
 
     CONVERGENCE_THRESHOLD = 1e-2
-    oldCentroids = []
-    newCentroids = kPoints
+    old_centroids = []
+    new_centroids = initial_centroids
     iteration = 0
     MAX_ITERATIONS = 100
 
     parallelizedPoints = lines.map(lambda line: Point(line,d)).cache()
 
-    while(compareCentroids(oldCentroids, newCentroids) > CONVERGENCE_THRESHOLD and iteration < MAX_ITERATIONS):
-        oldCentroids = newCentroids
+    while(compare_centroids(old_centroids, new_centroids) > CONVERGENCE_THRESHOLD and iteration < MAX_ITERATIONS):
+        old_centroids = new_centroids
         closest = parallelizedPoints.map(
-            lambda p: (closestPoint(p, newCentroids), (p, 1)))
+            lambda p: (find_closest_point(p, new_centroids), (p, 1)))
         '''
         print("---------------------------------")
         print("Mapper Output")
@@ -162,9 +161,9 @@ if __name__ == "__main__":
             print(str(row[0]) + "," + row[1].printPoint())
         print("--------------------------------")
         '''
-        newCentroids = [i for i in range(K)]
+        new_centroids = [i for i in range(K)]
         for row in newPoint.collect():
-            newCentroids[row[0]] = row[1]
+            new_centroids[row[0]] = row[1]
         iteration += 1
 
     """
@@ -177,12 +176,9 @@ if __name__ == "__main__":
     sc.parallelize([p.printPoint() for p in newCentroids], 1).saveAsTextFile(output_path)
     """
 
-    sc.parallelize([p.printPoint() for p in newCentroids], 1).saveAsTextFile(output_path)
+    sc.parallelize([p.printPoint() for p in new_centroids], 1).saveAsTextFile(output_path)
 
     end_time = time.time() # to prevent FileAlreadyExistsException
-    print("Tempo fine algoritmo: " + str(end_time))
-    print("Numero iterazioni: " + str(iteration) )
-    print("Durata algoritmo: " + str(end_time - start_time))
 
     spark.stop()
 
@@ -191,8 +187,8 @@ if __name__ == "__main__":
         "sampling_exec_time": sampling_end - start_time,
         "kmeans_exec_time": end_time - sampling_end,
         "iterations": iteration,
-        "centroids_last_movement": compareCentroids(oldCentroids, newCentroids),
-        "successful": compareCentroids(oldCentroids, newCentroids) <= CONVERGENCE_THRESHOLD,
+        "centroids_last_movement": compare_centroids(old_centroids, new_centroids),
+        "successful": compare_centroids(old_centroids, new_centroids) <= CONVERGENCE_THRESHOLD,
     }
 
     performance = "%.2f,%.2f,%.2f,%d,%.9f,%s\n" % (
