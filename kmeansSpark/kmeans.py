@@ -3,12 +3,14 @@ from __future__ import print_function
 import sys
 import random
 import time
+from argparse import ArgumentParser
 
 import numpy as np
+
 from pyspark.sql import SparkSession
 from Point import Point
 from pyspark import SparkContext
-
+import os
 
 def parseVector(line):
     return np.array([float(x) for x in line.split(' ')])
@@ -55,24 +57,58 @@ def add_tuples_values(a, b):
     sumCount = (a[1] + b[1])
     return resultPoint, sumCount
 
+"""
+def is_valid_file(parser, arg):
+    if not os.path.isfile(arg):
+        parser.error(f"The file {arg} does not exist")
+    else:
+        return arg
+
+def is_valid_dir(parser, arg):
+    if not os.path.isdir(arg):
+        parser.error(f"The directory {arg} does not exist")
+    else:
+        return arg
+"""
+
+def is_valid_file(parser, arg):
+    return arg
+
+def is_valid_dir(parser, arg):
+    return arg
 
 if __name__ == "__main__":
+
+    parser = ArgumentParser(
+        "Spark k-Means",
+        description="Execute the k-Means clustering algorithm")
+    parser.add_argument("d", type=int, help="dimension of points")
+    parser.add_argument("k", type=int, help="number of centers")
+    parser.add_argument(
+        "inputfile",
+        help="input file",
+        metavar="FILE",
+        type=lambda f: is_valid_file(parser, f))
+    parser.add_argument(
+        "outputdir",
+        help="output directory",
+        type=lambda d: is_valid_dir(parser, d))
+    parser.add_argument("n", type=int, help="number of points")
+
+    args = parser.parse_args()
+
+    K = args.k
+    d = args.d
+    data_path = args.inputfile
+    output_path = args.outputdir
+    n = args.n
+
     spark = SparkSession\
         .builder\
         .appName("PythonKMeans")\
         .getOrCreate()
     sc = SparkContext.getOrCreate()
     sc.addPyFile("./Point.py")
-
-    K = int(sys.argv[2])
-    d = int(sys.argv[1])
-    
-    data_path = sys.argv[3]
-    output_path = sys.argv[4]
-
-    n = sys.argv[5]
-
-    print("Parametri di ingresso k=" + str(K) + " d=" + str(d) + " path=" + data_path)
 
     lines = sc.textFile(data_path)
     
@@ -86,7 +122,7 @@ if __name__ == "__main__":
 
     print(kPoints)
 
-    CONVERGENCE_THRESHOLD = 1e-5
+    CONVERGENCE_THRESHOLD = 1e-2
     oldCentroids = []
     newCentroids = kPoints
     iteration = 0
