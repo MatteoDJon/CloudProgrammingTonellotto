@@ -148,6 +148,8 @@ if __name__ == "__main__":
     print("Numero iterazioni: " + str(iteration) )
     print("Durata algoritmo: " + str(end_time - start_time))
 
+    spark.stop()
+
     metrics = {
         "total_exec_time": end_time - start_time,
         "sampling_exec_time": sampling_end - start_time,
@@ -157,12 +159,13 @@ if __name__ == "__main__":
         "successful": compareCentroids(oldCentroids, newCentroids) <= CONVERGENCE_THRESHOLD,
     }
 
-    print("%.2f,%.2f,%.2f,%d,%.9f,%s\n" % (
+    performance = "%.2f,%.2f,%.2f,%d,%.9f,%s\n" % (
         metrics["total_exec_time"],
         metrics["sampling_exec_time"],
         metrics["kmeans_exec_time"],
         metrics["iterations"],
         metrics["centroids_last_movement"],
-        str(metrics["successful"]).lower(), ))
+        str(metrics["successful"]).lower(), )
 
-    spark.stop()
+    with open(f"spark_n={n}_d={d}_k={K}.csv", "a") as performance_file:
+        performance_file.write(performance)

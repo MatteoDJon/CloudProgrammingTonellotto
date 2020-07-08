@@ -1,5 +1,5 @@
 #!/bin/bash
-KMEANSSPARK=/home/hadoop/fede/CloudProgrammingTonellotto/kmeansSpark
+KMEANSSPARK=/home/hadoop/CloudProgrammingTonellotto/kmeansSpark
 
 n=1000
 d=3
