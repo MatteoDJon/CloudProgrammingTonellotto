@@ -117,13 +117,13 @@ if __name__ == "__main__":
     sc = SparkContext.getOrCreate()
     sc.addPyFile("./Point.py")
 
+    start_time = time.time()
+
     # read input data
-    lines = sc.textFile(input_data)
+    lines = sc.textFile(input_data)    
 
-    currentTime = time.time()
-    start_time = currentTime
-
-    initial_centroids = [Point(line,d) for line in lines.takeSample(withReplacement=True, num=K)]
+    # parse a sample of k lines, use as initial centroids
+    initial_centroids = [Point(line, d) for line in lines.takeSample(True, K)]
 
     sampling_end = time.time()
 

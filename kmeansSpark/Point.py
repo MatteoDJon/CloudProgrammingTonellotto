@@ -3,14 +3,16 @@ import math
 
 class Point:
 
-    def __init__(self, line, dim):
-        self.d = dim
-        self.point = []
+    def __init__(self, line, d):
+        self.d = d
+        self.point = None
+
         components = line.split(" ")
-        if (len(components) != self.d):
-            print("Dimension not correct")
-        for i in range(0, len(components)):
-            self.point.append(float(components[i]))
+        if len(components) != d:
+            return
+
+        self.point = [float(c) for c in components]
+
 
     def getDimension(self):
         return self.d
