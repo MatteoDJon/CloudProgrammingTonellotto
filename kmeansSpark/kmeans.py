@@ -17,34 +17,29 @@ def parseVector(line):
     return np.array([float(x) for x in line.split(' ')])
 
 
-def find_closest_point(p, centers):
-    bestIndex = 0
-    closest = float("+inf")
-    for i in range(0, len(centers)):
-        tempDist = p.distance(centers[i])
-        if tempDist < closest:
-            closest = tempDist
-            bestIndex = i
-    return bestIndex
+def find_closest_point(point, centroids):
+    nearest_cluster_id = 0
+    min_distance = float("inf")
+
+    for i in range(0, len(centroids)):
+        d = point.distance(centroids[i])
+        if d < min_distance:
+            min_distance = d
+            nearest_cluster_id = i
+
+    return nearest_cluster_id
 
 
 def compare_centroids(old, new):
-    if(len(old) != len(new)):
-        return float('inf')
-    tempError = 0.0
-    # TODO for f, b in zip(foo, bar):
-    for i in range(0, len(old)):
-        oldCentroid = old[i]
-        newCentroid = new[i]
-        dist = oldCentroid.computeSquaredDistance(newCentroid)
-        norm1 = oldCentroid.computeSquaredNorm()
-        norm2 = newCentroid.computeSquaredNorm()
-        minNorm = min(norm1, norm2)
-        tempError += (dist / minNorm)
-    print("----------------------------")
-    print("Error:" + str(tempError))
-    print("----------------------------")
-    return tempError
+    if len(old) != len(new):
+        return float("inf")
+
+    max_distance_sq = 0.0
+    for old_centroid, new_centroid in zip(old, new):
+        distance_sq = old_centroid.computeSquaredDistance(new_centroid)
+        max_distance_sq = max(max_distance_sq, distance_sq)
+
+    return max_distance_sq
 
 
 def sum_two_points(point1, point2):
@@ -111,7 +106,7 @@ if __name__ == "__main__":
 
     K = args.k
     d = args.d
-    data_path = args.inputfile
+    input_data = args.inputfile
     output_path = args.outputdir
     n = args.n
 
@@ -122,7 +117,8 @@ if __name__ == "__main__":
     sc = SparkContext.getOrCreate()
     sc.addPyFile("./Point.py")
 
-    lines = sc.textFile(data_path)
+    # read input data
+    lines = sc.textFile(input_data)
 
     currentTime = time.time()
     start_time = currentTime
