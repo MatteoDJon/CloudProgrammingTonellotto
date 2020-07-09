@@ -1,17 +1,12 @@
 from __future__ import print_function
 
 import sys
-import random
 import time
+
 from argparse import ArgumentParser
-
-import numpy as np
-
 from pyspark.sql import SparkSession
 from Point import Point
 from pyspark import SparkContext
-import os
-from pprint import pprint
 
 
 def find_closest_centroid(point, centroids):
@@ -47,6 +42,7 @@ def sum_point_count_pair(a, b):
     sum_count = a[1] + b[1]
     return sum_point, sum_count
 
+
 def hdfs_delete(spark, path):
     # without using 3rd party libraries or subprocess
     sc = spark.sparkContext
@@ -55,6 +51,7 @@ def hdfs_delete(spark, path):
           .fs.FileSystem
           .get(sc._jsc.hadoopConfiguration()))
     fs.delete(sc._jvm.org.apache.hadoop.fs.Path(path), True)
+
 
 if __name__ == "__main__":
 
@@ -74,7 +71,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    K = args.k
+    k = args.k
     d = args.d
     input_data = args.inputfile
     output_path = args.outputdir
@@ -90,10 +87,10 @@ if __name__ == "__main__":
     start_time = time.time()
 
     # read input data
-    lines = sc.textFile(input_data)    
+    lines = sc.textFile(input_data)
 
     # parse a sample of k lines, use as initial centroids
-    initial_centroids = [Point(line, d) for line in lines.takeSample(True, K)]
+    initial_centroids = [Point(line, d) for line in lines.takeSample(True, k)]
 
     sampling_end = time.time()
 
@@ -105,7 +102,7 @@ if __name__ == "__main__":
 
     CONVERGENCE_THRESHOLD = 1e-8
     dist = float("inf")
-    
+
     MAX_ITERATIONS = 100
     iteration = 0
 
@@ -115,39 +112,20 @@ if __name__ == "__main__":
         # <nearest_cluster_id, (point, 1)>
         closest = parallelizedPoints.map(
             lambda p: (find_closest_centroid(p, new_centroids), (p, 1)))
-        '''
-        print("---------------------------------")
-        print("Mapper Output")
-        for row in closest.collect():
-            print(str(row[0]) + "," + row[1]
-                  [0].printPoint() + "," + str(row[1][1]))
-        print("---------------------------------")
-        '''
-        # 
+
+        # compute sum of points and count (key by key)
         pointStats = closest.reduceByKey(sum_point_count_pair)
-        '''
-        print("---------------------------------")
-        print("Reducer Output")
-        for row in pointStats.collect():
-            print(str(row[0]) + "," + row[1]
-                  [0].printPoint() + "," + str(row[1][1]))
-        print("---------------------------------")
-        print("---------------------------------")
-        print("New Centroids")
-        '''
+
+        # <cluster_id, new_centroid>
         newPoint = pointStats.map(
             lambda p: (
                 p[0], p[1][0].getAverage(
                     p[1][1])))
-        '''
-        for row in newPoint.collect():
-            print(str(row[0]) + "," + row[1].printPoint())
-        print("--------------------------------")
-        '''
-        new_centroids = [i for i in range(K)]
-        for row in newPoint.collect():
-            new_centroids[row[0]] = row[1]
-        
+
+        new_centroids = [i for i in range(k)]
+        for cluster_id, centroid in newPoint.collect():
+            new_centroids[cluster_id] = centroid
+
         dist = compare_centroids(old_centroids, new_centroids)
         iteration += 1
 
@@ -172,7 +150,7 @@ if __name__ == "__main__":
     }
 
     # write performance to csv file
-    with open(f"spark_n={n}_d={d}_k={K}.csv", "a") as performance_file:
+    with open(f"spark_n={n}_d={d}_k={k}.csv", "a") as performance_file:
 
         performance = "%.2f,%.2f,%.2f,%d,%.9f,%s\n" % (
             metrics["total_exec_time"],
