@@ -12,7 +12,7 @@ inputfile="data_n=${n}_d=${d}_k=${k}.txt"
 inputpath="data-stdev0.2/${inputfile}"
 
 outputfile="centroids_n=${n}_d=${d}_k=${k}.txt"
-outputpath="result-stdev0.2/${outputfile}"
+outputpath="hadoop/result-stdev0.2/${outputfile}"
 
 hadoop jar ${KMEANS}/target/KMeans-1.0-SNAPSHOT.jar it.unipi.hadoop.Driver ${d} ${k} ${inputpath} ${outputpath} ${n}
 

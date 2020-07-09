@@ -11,6 +11,7 @@ from pyspark.sql import SparkSession
 from Point import Point
 from pyspark import SparkContext
 import os
+from pprint import pprint
 
 def parseVector(line):
     return np.array([float(x) for x in line.split(' ')])
@@ -31,6 +32,7 @@ def compare_centroids(old, new):
     if(len(old) != len(new)):
         return float('inf')
     tempError = 0.0
+    # TODO for f, b in zip(foo, bar):
     for i in range(0, len(old)):
         oldCentroid = old[i]
         newCentroid = new[i]
@@ -70,6 +72,16 @@ def is_valid_dir(parser, arg):
     else:
         return arg
 """
+
+
+def hdfs_delete_path(spark, path):
+    # without using 3rd party libraries
+    sc = spark.sparkContext
+    fs = (sc._jvm.org
+          .apache.hadoop
+          .fs.FileSystem
+          .get(sc._jsc.hadoopConfiguration()))
+    fs.delete(sc._jvm.org.apache.hadoop.fs.Path(path), True)
 
 def is_valid_file(parser, arg):
     return arg
@@ -111,7 +123,7 @@ if __name__ == "__main__":
     sc.addPyFile("./Point.py")
 
     lines = sc.textFile(data_path)
-    
+
     currentTime = time.time()
     start_time = currentTime
 
@@ -119,7 +131,9 @@ if __name__ == "__main__":
 
     sampling_end = time.time()
 
-    print(initial_centroids)
+    # pprint(initial_centroids)
+    # pprint([p.printPoint() for p in initial_centroids])
+    # pprint([str(p) for p in initial_centroids])
 
     CONVERGENCE_THRESHOLD = 1e-2
     old_centroids = []
@@ -166,19 +180,12 @@ if __name__ == "__main__":
             new_centroids[row[0]] = row[1]
         iteration += 1
 
-    """
-    filesystem = sc._jvm.org.apache.hadoop.fs.FileSystem
-    fs = filesystem.get(sc._jsc.hadoopConfiguration())
-    path = sc._jvm.org.apache.hadoop.fs.Path
-    output_path_for_hadoop = sc._jvm.org.apache.hadoop.fs.Path(output_path)
-    if (fs.exists(output_path_for_hadoop)):
-        fs.delete(output_path_for_hadoop, True);
-    sc.parallelize([p.printPoint() for p in newCentroids], 1).saveAsTextFile(output_path)
-    """
+    # delete output directory (if any)
+    hdfs_delete_path(spark, output_path)
 
-    sc.parallelize([p.printPoint() for p in new_centroids], 1).saveAsTextFile(output_path)
+    sc.parallelize([str(c) for c in new_centroids], 1).saveAsTextFile(output_path)
 
-    end_time = time.time() # to prevent FileAlreadyExistsException
+    end_time = time.time()
 
     spark.stop()
 

@@ -36,13 +36,13 @@ class Point:
         otherPointComponents = point.getComponents()
         distance = 0.0
         for i in range(0, self.d):
-            distance += math.pow(self.point[i]-otherPointComponents[i], 2)
+            distance += math.pow(self.point[i] - otherPointComponents[i], 2)
         return distance
 
     def computeSquaredNorm(self):
         sum = 0.0
         for i in range(0, self.d):
-            sum += (self.point[i]*self.point[i])
+            sum += (self.point[i] * self.point[i])
         return sum
 
     def distance(self, point):
@@ -51,16 +51,8 @@ class Point:
         otherComponents = point.getComponents()
         distance = 0
         for i in range(0, self.d):
-            distance += math.pow(self.point[i]-otherComponents[i], 2)
+            distance += math.pow(self.point[i] - otherComponents[i], 2)
         return math.sqrt(distance)
-
-    def printPoint(self):
-        textPoint = ""
-        for i in range(0, self.d-1):
-            textPoint += str(self.point[i])
-            textPoint += ","
-        textPoint += str(self.point[self.d-1])
-        return textPoint
 
     def comparePoint(self, otherPoint):
         otherComponents = otherPoint.getComponents()

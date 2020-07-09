@@ -188,5 +188,6 @@ dmypy.json
 # Cython debug symbols
 cython_debug/
 
-# cartella di prova
+# file di prova, vecchi o temporanei
 kmeans_prova/
+hdfs_old_stuff
