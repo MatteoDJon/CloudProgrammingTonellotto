@@ -14,7 +14,7 @@ import os
 from pprint import pprint
 
 
-def find_closest_point(point, centroids):
+def find_closest_centroid(point, centroids):
     nearest_cluster_id = 0
     min_distance = float("inf")
 
@@ -39,17 +39,13 @@ def compare_centroids(old, new):
     return max_distance_sq
 
 
-def sum_two_points(point1, point2):
-    return point1.sumPoint(point2)
-
-
-def add_tuples_values(a, b):
-    pointOne = a[0]
-    pointTwo = b[0]
-    resultPoint = pointOne
-    resultPoint.sumPoint(pointTwo)
-    sumCount = (a[1] + b[1])
-    return resultPoint, sumCount
+def sum_point_count_pair(a, b):
+    p1 = a[0]
+    p2 = b[0]
+    sum_point = p1
+    sum_point.sumPoint(p2)
+    sum_count = a[1] + b[1]
+    return sum_point, sum_count
 
 def hdfs_delete(spark, path):
     # without using 3rd party libraries or subprocess
@@ -113,12 +109,12 @@ if __name__ == "__main__":
     MAX_ITERATIONS = 100
     iteration = 0
 
-    while (compare_centroids(old_centroids, new_centroids) > CONVERGENCE_THRESHOLD and iteration < MAX_ITERATIONS):
+    while dist > CONVERGENCE_THRESHOLD and iteration < MAX_ITERATIONS:
         old_centroids = new_centroids
 
         # <nearest_cluster_id, (point, 1)>
         closest = parallelizedPoints.map(
-            lambda p: (find_closest_point(p, new_centroids), (p, 1)))
+            lambda p: (find_closest_centroid(p, new_centroids), (p, 1)))
         '''
         print("---------------------------------")
         print("Mapper Output")
@@ -128,7 +124,7 @@ if __name__ == "__main__":
         print("---------------------------------")
         '''
         # 
-        pointStats = closest.reduceByKey(add_tuples_values)
+        pointStats = closest.reduceByKey(sum_point_count_pair)
         '''
         print("---------------------------------")
         print("Reducer Output")
@@ -151,12 +147,14 @@ if __name__ == "__main__":
         new_centroids = [i for i in range(K)]
         for row in newPoint.collect():
             new_centroids[row[0]] = row[1]
+        
+        dist = compare_centroids(old_centroids, new_centroids)
         iteration += 1
 
     # delete output directory (if any)
     hdfs_delete(spark, output_path)
 
-    # store centroids
+    # store results
     sc.parallelize([str(c) for c in new_centroids], 1).saveAsTextFile(output_path)
 
     end_time = time.time()
@@ -169,8 +167,8 @@ if __name__ == "__main__":
         "sampling_exec_time": sampling_end - start_time,
         "kmeans_exec_time": end_time - sampling_end,
         "iterations": iteration,
-        "centroids_last_movement": compare_centroids(old_centroids, new_centroids),
-        "successful": compare_centroids(old_centroids, new_centroids) <= CONVERGENCE_THRESHOLD,
+        "centroids_last_movement": dist,
+        "successful": dist <= CONVERGENCE_THRESHOLD,
     }
 
     # write performance to csv file
