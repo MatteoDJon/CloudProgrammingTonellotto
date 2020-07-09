@@ -11,8 +11,9 @@ inputpath="data-stdev0.2/${inputfile}"
 outputdir="centroids_n=${n}_d=${d}_k=${k}.d"
 outputpath="spark/result-stdev0.2/${outputdir}"
 
-# hadoop fs -rm -r ${outputpath}
 python3 ${KMEANSSPARK}/kmeans.py ${d} ${k} ${inputpath} ${outputpath} ${n}
 
 echo "*** Final Centroids ***"
 hadoop fs -cat ${outputpath}/part-00000
+
+hadoop fs -rm -r ${outputpath}

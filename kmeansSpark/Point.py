@@ -5,14 +5,10 @@ class Point:
 
     def __init__(self, line, d):
         self.d = d
-        self.point = None
+        self.point = [float(c) for c in line.split(" ")]
 
-        components = line.split(" ")
-        if len(components) != d:
-            return
-
-        self.point = [float(c) for c in components]
-
+        if len(self.point) != d:
+            self.point = None
 
     def getDimension(self):
         return self.d

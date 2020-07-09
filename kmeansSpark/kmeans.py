@@ -13,9 +13,6 @@ from pyspark import SparkContext
 import os
 from pprint import pprint
 
-def parseVector(line):
-    return np.array([float(x) for x in line.split(' ')])
-
 
 def find_closest_point(point, centroids):
     nearest_cluster_id = 0
@@ -54,35 +51,14 @@ def add_tuples_values(a, b):
     sumCount = (a[1] + b[1])
     return resultPoint, sumCount
 
-"""
-def is_valid_file(parser, arg):
-    if not os.path.isfile(arg):
-        parser.error(f"The file {arg} does not exist")
-    else:
-        return arg
-
-def is_valid_dir(parser, arg):
-    if not os.path.isdir(arg):
-        parser.error(f"The directory {arg} does not exist")
-    else:
-        return arg
-"""
-
-
-def hdfs_delete_path(spark, path):
-    # without using 3rd party libraries
+def hdfs_delete(spark, path):
+    # without using 3rd party libraries or subprocess
     sc = spark.sparkContext
     fs = (sc._jvm.org
           .apache.hadoop
           .fs.FileSystem
           .get(sc._jsc.hadoopConfiguration()))
     fs.delete(sc._jvm.org.apache.hadoop.fs.Path(path), True)
-
-def is_valid_file(parser, arg):
-    return arg
-
-def is_valid_dir(parser, arg):
-    return arg
 
 if __name__ == "__main__":
 
@@ -94,12 +70,10 @@ if __name__ == "__main__":
     parser.add_argument(
         "inputfile",
         help="input file",
-        metavar="FILE",
-        type=lambda f: is_valid_file(parser, f))
+        metavar="FILE")
     parser.add_argument(
         "outputdir",
-        help="output directory",
-        type=lambda d: is_valid_dir(parser, d))
+        help="output directory")
     parser.add_argument("n", type=int, help="number of points")
 
     args = parser.parse_args()
@@ -127,20 +101,22 @@ if __name__ == "__main__":
 
     sampling_end = time.time()
 
-    # pprint(initial_centroids)
-    # pprint([p.printPoint() for p in initial_centroids])
-    # pprint([str(p) for p in initial_centroids])
+    # parse points and cache them
+    parallelizedPoints = lines.map(lambda line: Point(line, d)).cache()
 
-    CONVERGENCE_THRESHOLD = 1e-2
     old_centroids = []
     new_centroids = initial_centroids
-    iteration = 0
+
+    CONVERGENCE_THRESHOLD = 1e-8
+    dist = float("inf")
+    
     MAX_ITERATIONS = 100
+    iteration = 0
 
-    parallelizedPoints = lines.map(lambda line: Point(line,d)).cache()
-
-    while(compare_centroids(old_centroids, new_centroids) > CONVERGENCE_THRESHOLD and iteration < MAX_ITERATIONS):
+    while (compare_centroids(old_centroids, new_centroids) > CONVERGENCE_THRESHOLD and iteration < MAX_ITERATIONS):
         old_centroids = new_centroids
+
+        # <nearest_cluster_id, (point, 1)>
         closest = parallelizedPoints.map(
             lambda p: (find_closest_point(p, new_centroids), (p, 1)))
         '''
@@ -151,6 +127,7 @@ if __name__ == "__main__":
                   [0].printPoint() + "," + str(row[1][1]))
         print("---------------------------------")
         '''
+        # 
         pointStats = closest.reduceByKey(add_tuples_values)
         '''
         print("---------------------------------")
@@ -177,14 +154,16 @@ if __name__ == "__main__":
         iteration += 1
 
     # delete output directory (if any)
-    hdfs_delete_path(spark, output_path)
+    hdfs_delete(spark, output_path)
 
+    # store centroids
     sc.parallelize([str(c) for c in new_centroids], 1).saveAsTextFile(output_path)
 
     end_time = time.time()
 
     spark.stop()
 
+    # compute performance metrics
     metrics = {
         "total_exec_time": end_time - start_time,
         "sampling_exec_time": sampling_end - start_time,
@@ -194,13 +173,15 @@ if __name__ == "__main__":
         "successful": compare_centroids(old_centroids, new_centroids) <= CONVERGENCE_THRESHOLD,
     }
 
-    performance = "%.2f,%.2f,%.2f,%d,%.9f,%s\n" % (
-        metrics["total_exec_time"],
-        metrics["sampling_exec_time"],
-        metrics["kmeans_exec_time"],
-        metrics["iterations"],
-        metrics["centroids_last_movement"],
-        str(metrics["successful"]).lower(), )
-
+    # write performance to csv file
     with open(f"spark_n={n}_d={d}_k={K}.csv", "a") as performance_file:
+
+        performance = "%.2f,%.2f,%.2f,%d,%.9f,%s\n" % (
+            metrics["total_exec_time"],
+            metrics["sampling_exec_time"],
+            metrics["kmeans_exec_time"],
+            metrics["iterations"],
+            metrics["centroids_last_movement"],
+            str(metrics["successful"]).lower(), )
+
         performance_file.write(performance)
