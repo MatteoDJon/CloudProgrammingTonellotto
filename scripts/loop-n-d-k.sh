@@ -10,8 +10,7 @@ do
     do
         for k in "${centroids[@]}"
         do
-            # echo "data_n=${n}_d=${d}_k=${k}.txt"
-            python3 clusters_generator.py ${n} ${d} ${k}
+            echo "${n} ${d} ${k}"
         done
     done
 done
