@@ -4,9 +4,15 @@ KMEANS=/home/hadoop/CloudProgrammingTonellotto/kmeans
 mvn clean -f "${KMEANS}/pom.xml"
 mvn package -f "${KMEANS}/pom.xml"
 
-n=1000
-d=7
-k=13
+n=$1
+d=$2
+k=$3
+
+if [ "${n}" = "" ] || [ "${d}" = "" ] || [ "${k}" = "" ]; then
+    n=1000
+    d=3
+    k=7
+fi
 
 inputfile="data_n=${n}_d=${d}_k=${k}.txt"
 inputpath="data/${inputfile}"
