@@ -30,7 +30,7 @@ import it.unipi.hadoop.sampling.UniformSampling;
 
 public class Driver {
 
-    private static final double CONVERGENCE_THRESHOLD = 1e-2;
+    private static final double CONVERGENCE_THRESHOLD = 1e-6;
     private static final int MAX_ITERATIONS = 100;
 
     private static String outputName = "centroids.txt";

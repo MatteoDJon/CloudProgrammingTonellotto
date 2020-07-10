@@ -4,9 +4,11 @@ import sys
 import time
 
 from argparse import ArgumentParser
+from pathlib import Path
 from pyspark.sql import SparkSession
 from Point import Point
 from pyspark import SparkContext
+import os
 
 
 def find_closest_centroid(point, centroids):
@@ -77,12 +79,14 @@ if __name__ == "__main__":
     output_path = args.outputdir
     n = args.n
 
+    dot = os.path.dirname(os.path.abspath(__file__))
+
     spark = SparkSession\
         .builder\
         .appName("PythonKMeans")\
         .getOrCreate()
     sc = SparkContext.getOrCreate()
-    sc.addPyFile("./Point.py")
+    sc.addPyFile(os.path.join(dot, "Point.py"))
 
     start_time = time.time()
 
@@ -100,7 +104,7 @@ if __name__ == "__main__":
     old_centroids = []
     new_centroids = initial_centroids
 
-    CONVERGENCE_THRESHOLD = 1e-8
+    CONVERGENCE_THRESHOLD = 1e-6
     dist = float("inf")
 
     MAX_ITERATIONS = 100
