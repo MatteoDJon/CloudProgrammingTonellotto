@@ -24,7 +24,7 @@ outputfile="centroids_n=${n}_d=${d}_k=${k}.txt"
 outputpath="hadoop/result/${outputfile}"
 
 # repeat
-for i in {1..2}
+for i in {1..10}
 do
     # cmd to run
     hadoop jar ${KMEANS}/target/KMeans-1.0-SNAPSHOT.jar it.unipi.hadoop.Driver ${d} ${k} ${inputpath} ${outputpath} ${n}

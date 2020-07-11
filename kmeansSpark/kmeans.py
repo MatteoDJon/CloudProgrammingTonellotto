@@ -104,7 +104,7 @@ if __name__ == "__main__":
     old_centroids = []
     new_centroids = initial_centroids
 
-    CONVERGENCE_THRESHOLD = 1e-6
+    CONVERGENCE_THRESHOLD = 1e-4
     dist = float("inf")
 
     MAX_ITERATIONS = 100

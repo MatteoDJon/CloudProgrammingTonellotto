@@ -20,7 +20,7 @@ outputdir="centroids_n=${n}_d=${d}_k=${k}.d"
 outputpath="spark/result/${outputdir}"
 
 # repeat
-for i in {1..2}
+for i in {1..10}
 do
     # cmd to run
     python3 ${KMEANSSPARK}/kmeans.py ${d} ${k} ${inputpath} ${outputpath} ${n}
