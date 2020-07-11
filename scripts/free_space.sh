@@ -21,11 +21,17 @@ cd ${originalpath}
 
 # *** Some useful commands ***
 
-# hdfs dfsadmin -safemode leave
+# du -sh *
+
+# find / -type d -name "usercache" -print 2>/dev/null
 
 # docker rmi $(docker images -a | awk '{print $3}')
 # docker rm $(docker ps -a | awk '{print $1}')
 
-# find / -type d -name "usercache" -print 2>/dev/null
+# rm -rf /opt/hadoop/logs/*
 
-# du -sh *
+# hadoop fs -rm /mr-history/tmp/hadoop/*
+# hadoop fs -rm /spark-logs/*
+
+# hadoop fs -ls /spark-logs | awk '{print $5}' | awk '{sum += $1} END {print sum/(1024*1024*1024) " GiB"}'
+# hadoop fs -ls /mr-history/tmp/hadoop | awk '{print $5}' | awk '{sum += $1} END {print sum/(1024*1024*1024) " GiB"}'
