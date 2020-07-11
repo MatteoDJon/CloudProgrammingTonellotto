@@ -22,7 +22,8 @@ outputpath="spark/result/${outputdir}"
 # repeat
 for i in {1..10}
 do
-    # cmd to run
+    # free space and run command
+    ./free_space.sh
     python3 ${KMEANSSPARK}/kmeans.py ${d} ${k} ${inputpath} ${outputpath} ${n}
 
     # check success
@@ -30,9 +31,6 @@ do
     if [ $RESULT -eq 0 ]; then
         echo "Repetition ${i} succeded"
     else
-        # free some space and retry
-        ./free_space.sh
-        echo "Retrying repetition ${i}"
-        python3 ${KMEANSSPARK}/kmeans.py ${d} ${k} ${inputpath} ${outputpath} ${n}
+        echo "Repetition ${i} failed"
     fi
 done
