@@ -11,50 +11,54 @@ import org.apache.hadoop.io.Writable;
 
 class WritableWrapper implements Writable {
 
-    private Point p;
-    private IntWritable count = new IntWritable();
+    private Point point;
+    private int count;
+
+    private static IntWritable wCount = new IntWritable();
 
     public WritableWrapper() {
 
     }
 
-    public WritableWrapper(Point p) {
-        this(p, 1);
+    public WritableWrapper(Point point) {
+        this(point, 1);
     }
 
-    public WritableWrapper(Point p, int count) {
-        this.p = p;
-        this.count.set(count);
+    public WritableWrapper(Point point, int count) {
+        this.point = point;
+        this.count = count;
     }
 
     public Point getPoint() {
-        return p;
+        return point;
     }
 
-    public WritableWrapper setPoint(Point p) {
-        this.p = p;
+    public WritableWrapper setPoint(Point point) {
+        this.point = point;
         return this;
     }
 
     public int getCount() {
-        return count.get();
+        return count;
     }
 
     public WritableWrapper setCount(int count) {
-        this.count.set(count);
+        this.count = count;
         return this;
     }
 
     @Override
     public void write(DataOutput out) throws IOException {
-        count.write(out);
-        p.write(out);
+        wCount.set(count);
+        wCount.write(out);
+        point.write(out);
     }
 
     @Override
     public void readFields(DataInput in) throws IOException {
-        count.readFields(in);
-        p = Point.read(in);
+        wCount.readFields(in);
+        count = wCount.get();
+        point = Point.read(in);
     }
 
     public static WritableWrapper read(DataInput in) throws IOException {
@@ -65,7 +69,7 @@ class WritableWrapper implements Writable {
 
     @Override
     public String toString() {
-        return "(" + count + ") [" + p + "]";
+        return "(" + count + ") [" + point + "]";
     }
 
     public static WritableWrapper parseString(String wrapperString) throws ParseException {
