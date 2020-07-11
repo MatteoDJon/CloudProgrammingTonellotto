@@ -166,7 +166,6 @@ public class Driver {
             }
         }
 
-        // TODO maybe check if centroids are not k
     }
 
     static double compareCentroids(List<Point> oldCentroids, List<Point> newCentroids) {
@@ -174,23 +173,18 @@ public class Driver {
         // la versione precedente e la versione nuova --> stessa dimensione e stesso
         // numero
 
-        double tempDistance = 0.0;
+        double maxDistance = 0.0;
 
         for (int i = 0; i < oldCentroids.size(); i++) {
 
             Point oldCentroid = oldCentroids.get(i);
             Point newCentroid = newCentroids.get(i);
 
-            double dist = oldCentroid.computeSquaredDistance(newCentroid);
-
-            double norm1 = oldCentroid.computeSquaredNorm();
-            double norm2 = newCentroid.computeSquaredNorm();
-            double minNorm = Double.min(norm1, norm2);
-
-            tempDistance += (dist / minNorm);
+            double distance = oldCentroid.computeSquaredDistance(newCentroid);
+            maxDistance += Double.max(maxDistance, distance);
         }
 
-        return tempDistance;
+        return maxDistance;
     }
 
     public static void main(String[] args) throws Exception {
