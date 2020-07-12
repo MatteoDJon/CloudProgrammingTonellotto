@@ -181,7 +181,7 @@ public class Driver {
             Point newCentroid = newCentroids.get(i);
 
             double distance = oldCentroid.computeSquaredDistance(newCentroid);
-            maxDistance += Double.max(maxDistance, distance);
+            maxDistance = Double.max(maxDistance, distance);
         }
 
         return maxDistance;

@@ -28,14 +28,12 @@ class Point:
             self.point[i] = (self.point[i] / pointInCluster)
         return self
 
-    def computeSquaredDistance(self, point):
-        if(self.d != point.getDimension()):
-            print("Dimension mismatch")
-        otherPointComponents = point.getComponents()
-        distance = 0.0
-        for i in range(0, self.d):
-            distance += math.pow(self.point[i] - otherPointComponents[i], 2)
-        return distance
+    def computeSquaredDistance(self, that):
+        distance_sq = 0.0
+        for x_i, y_i in zip(self.point, that.point):
+            distance_sq += (x_i - y_i) ** 2
+            
+        return distance_sq
 
     def computeSquaredNorm(self):
         sum = 0.0
