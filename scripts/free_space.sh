@@ -9,6 +9,9 @@ if [ "${namenode}" = "hadoop-namenode" ]; then
 
     cd /opt/yarn/local/usercache/hadoop/filecache && sudo rm -rf *
 
+    hadoop fs -rm /mr-history/tmp/hadoop/*
+    hadoop fs -rm /spark-logs/*
+
     hdfs dfsadmin -safemode leave
 else
 

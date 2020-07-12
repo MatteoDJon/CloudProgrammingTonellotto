@@ -33,4 +33,9 @@ do
     else
         echo "Repetition ${i} failed"
     fi
+
+    # backup and truncate nohup.out
+    cp nohup.out "nohup-spark-${i}.out"
+    echo "" > nohup.out
+
 done
