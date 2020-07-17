@@ -20,7 +20,7 @@ outputdir="centroids_n=${n}_d=${d}_k=${k}.d"
 outputpath="spark/result/${outputdir}"
 
 # repeat
-for i in {1..10}
+for i in {1..30}
 do
     # free space and run command
     ./free_space.sh

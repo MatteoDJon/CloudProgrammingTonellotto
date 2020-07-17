@@ -5,9 +5,12 @@ originalpath=$PWD
 namenode=$(cat /etc/hostname | grep "hadoop-namenode")
 if [ "${namenode}" = "hadoop-namenode" ]; then
     stop-yarn.sh
+    stop-dfs.sh
+    start-dfs.sh
     start-yarn.sh
 
-    cd /opt/yarn/local/usercache/hadoop/filecache && sudo rm -rf *
+    cd /opt/yarn/local/usercache/hadoop/filecache && rm -rf *
+    cd /opt/hadoop/logs && rm -rf *
 
     hadoop fs -rm /mr-history/tmp/hadoop/*
     hadoop fs -rm /spark-logs/*
@@ -15,7 +18,9 @@ if [ "${namenode}" = "hadoop-namenode" ]; then
     hdfs dfsadmin -safemode leave
 else
 
-    cd /tmp/hadoop-hadoop/nm-local-dir/usercache/hadoop/filecache && sudo rm -rf *
+    cd /tmp/hadoop-hadoop/nm-local-dir/usercache/hadoop/filecache && rm -rf *
+    cd /opt/hadoop/logs && rm -rf *
+    hdfs dfsadmin -safemode leave # anche un datanode può essere in safemode
 fi
 
 df -h
