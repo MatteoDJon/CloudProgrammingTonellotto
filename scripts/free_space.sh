@@ -20,7 +20,7 @@ else
 
     cd /tmp/hadoop-hadoop/nm-local-dir/usercache/hadoop/filecache && rm -rf *
     cd /opt/hadoop/logs && rm -rf *
-    hdfs dfsadmin -safemode leave # anche un datanode può essere in safemode
+    hdfs dfsadmin -safemode leave
 fi
 
 df -h
